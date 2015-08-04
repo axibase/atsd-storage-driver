@@ -17,10 +17,10 @@ package storage
 import (
 	"container/list"
 	"github.com/golang/glog"
-	"github.com/google/cadvisor/storage/atsd/net"
-	"github.com/google/cadvisor/storage/atsd/net/http"
-	httpmodel "github.com/google/cadvisor/storage/atsd/net/http/model"
-	netmodel "github.com/google/cadvisor/storage/atsd/net/model"
+	"github.com/axibase/atsd-api-go/net"
+	"github.com/axibase/atsd-api-go/net/http"
+	httpmodel "github.com/axibase/atsd-api-go/net/http/model"
+	netmodel "github.com/axibase/atsd-api-go/net/model"
 	"strconv"
 	"time"
 )

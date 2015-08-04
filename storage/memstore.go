@@ -16,7 +16,7 @@ package storage
 
 import (
 	"container/list"
-	"github.com/google/cadvisor/storage/atsd/net/model"
+	"github.com/axibase/atsd-api-go/net/model"
 	"sort"
 	"sync"
 )
