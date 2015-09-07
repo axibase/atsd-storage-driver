@@ -1,30 +1,32 @@
-// Copyright 2014 Google Inc. All Rights Reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+* Copyright 2015 Axibase Corporation or its affiliates. All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+* https://www.axibase.com/atsd/axibase-apache-2.0.pdf
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*/
 
 package storage
 
 import (
-	"container/list"
 	"github.com/axibase/atsd-api-go/net/model"
 	"sort"
 	"sync"
 )
 
 type MemStore struct {
-	seriesCommandMap *map[string]*list.List
+	seriesCommandMap *map[string]*Chunk
 
 	properties []*model.PropertyCommand
+
+	messages []*model.MessageCommand
 
 	entityTagCommands []*model.EntityTagCommand
 
@@ -35,7 +37,7 @@ type MemStore struct {
 
 func NewMemStore(limit uint64) *MemStore {
 	ms := &MemStore{
-		seriesCommandMap: &map[string]*list.List{},
+		seriesCommandMap: &map[string]*Chunk{},
 		Limit:            limit,
 	}
 	return ms
@@ -47,7 +49,7 @@ func (self *MemStore) AppendSeriesCommands(commands []*model.SeriesCommand) {
 		for i := 0; i < len(commands); i++ {
 			key := self.getKey(commands[i])
 			if _, ok := (*self.seriesCommandMap)[key]; !ok {
-				(*self.seriesCommandMap)[key] = list.New()
+				(*self.seriesCommandMap)[key] = NewChunk()
 			}
 			(*self.seriesCommandMap)[key].PushBack(commands[i])
 		}
@@ -67,13 +69,25 @@ func (self *MemStore) AppendEntityTagCommands(entityUpdateCommands []*model.Enti
 		self.entityTagCommands = append(self.entityTagCommands, entityUpdateCommands...)
 	}
 }
+func (self *MemStore) AppendMessageCommands(messageCommands []*model.MessageCommand) {
+	self.Lock()
+	defer self.Unlock()
+	if uint64(self.Size()) < self.Limit {
+		self.messages = append(self.messages, messageCommands...)
+	}
 
-func (self *MemStore) ReleaseSeriesCommandMap() *map[string]*list.List {
+}
+
+func (self *MemStore) ReleaseSeriesCommandChunks() []*Chunk {
 	self.Lock()
 	defer self.Unlock()
 	smap := self.seriesCommandMap
-	self.seriesCommandMap = &map[string]*list.List{}
-	return smap
+	self.seriesCommandMap = &map[string]*Chunk{}
+	seriesCommandsChunks := []*Chunk{}
+	for _, val := range *smap {
+		seriesCommandsChunks = append(seriesCommandsChunks, val)
+	}
+	return seriesCommandsChunks
 }
 func (self *MemStore) ReleaseProperties() []*model.PropertyCommand {
 	self.Lock()
@@ -89,22 +103,29 @@ func (self *MemStore) ReleaseEntityTagCommands() []*model.EntityTagCommand {
 	self.entityTagCommands = nil
 	return entityTagCommands
 }
-func (self *MemStore) SeriesCommandCount() int {
-	commandCount := 0
+func (self *MemStore) SeriesCommandCount() uint64 {
+
+	commandCount := uint64(0)
 
 	for _, val := range *(self.seriesCommandMap) {
-		commandCount += val.Len()
+		commandCount += uint64(val.Len())
 	}
 	return commandCount
 }
-func (self *MemStore) PropertiesCount() int {
-	return len(self.properties)
+func (self *MemStore) PropertiesCount() uint64 {
+
+	return uint64(len(self.properties))
 }
-func (self *MemStore) EntitiesCount() int {
-	return len(self.entityTagCommands)
+func (self *MemStore) MessagesCount() uint64 {
+
+	return uint64(len(self.messages))
+}
+func (self *MemStore) EntitiesCount() uint64 {
+
+	return uint64(len(self.entityTagCommands))
 }
 func (self *MemStore) Size() uint64 {
-	return uint64(self.EntitiesCount() + self.PropertiesCount() + self.SeriesCommandCount())
+	return self.EntitiesCount() + self.PropertiesCount() + self.SeriesCommandCount() + self.MessagesCount()
 }
 
 func (self *MemStore) getKey(sc *model.SeriesCommand) string {
@@ -128,4 +149,12 @@ func (self *MemStore) getKey(sc *model.SeriesCommand) string {
 	}
 
 	return key
+}
+
+func (self *MemStore) ReleaseMessageCommands() []*model.MessageCommand {
+	self.Lock()
+	defer self.Unlock()
+	messages := self.messages
+	self.messages = nil
+	return messages
 }
