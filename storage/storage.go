@@ -11,7 +11,7 @@
 * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
 * express or implied. See the License for the specific language governing
 * permissions and limitations under the License.
-*/
+ */
 
 package storage
 
@@ -44,18 +44,20 @@ type IWriteCommunicator interface {
 	SelfMetricValues() []*metricValue
 }
 type Storage struct {
-	senderHostname string
-	metricPrefix   string
+	selfMetricsEntity string
+	metricPrefix      string
 
 	memstore          *MemStore
 	writeCommunicator IWriteCommunicator
 
 	atsdHttpClient *http.Client
 
-	isUpdating     bool
-	updateInterval time.Duration
-	stopUpdateTask chan bool
-	mutex          sync.Mutex
+	isUpdating             bool
+	updateInterval         time.Duration
+	selfMetricSendInterval time.Duration
+	stopUpdateTask         chan bool
+	stopSelfMetricSendTask chan bool
+	mutex                  sync.Mutex
 }
 
 func (self *Storage) updateTask() {
@@ -73,7 +75,7 @@ func (self *Storage) selfMetricSendTask() {
 
 	seriesCommands := []*netmodel.SeriesCommand{}
 	for _, metricValue := range writeCommunicatorMetricValues {
-		seriesCommand := netmodel.NewSeriesCommand(self.senderHostname, self.metricPrefix+"."+metricValue.name, metricValue.value).
+		seriesCommand := netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+"."+metricValue.name, metricValue.value).
 			SetTimestamp(timestamp)
 		for name, val := range metricValue.tags {
 			seriesCommand.SetTag(name, val)
@@ -81,15 +83,15 @@ func (self *Storage) selfMetricSendTask() {
 		seriesCommands = append(seriesCommands, seriesCommand)
 	}
 
-	seriesCommand := netmodel.NewSeriesCommand(self.senderHostname, self.metricPrefix+".memstore.entities.count", netmodel.Int64(self.memstore.EntitiesCount())).SetTimestamp(timestamp)
+	seriesCommand := netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.entities.count", netmodel.Int64(self.memstore.EntitiesCount())).SetTimestamp(timestamp)
 	seriesCommands = append(seriesCommands, seriesCommand)
-	seriesCommand = netmodel.NewSeriesCommand(self.senderHostname, self.metricPrefix+".memstore.Messages.count", netmodel.Int64(self.memstore.MessagesCount())).SetTimestamp(timestamp)
+	seriesCommand = netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.messages.count", netmodel.Int64(self.memstore.MessagesCount())).SetTimestamp(timestamp)
 	seriesCommands = append(seriesCommands, seriesCommand)
-	seriesCommand = netmodel.NewSeriesCommand(self.senderHostname, self.metricPrefix+".memstore.properties.count", netmodel.Int64(self.memstore.PropertiesCount())).SetTimestamp(timestamp)
+	seriesCommand = netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.properties.count", netmodel.Int64(self.memstore.PropertiesCount())).SetTimestamp(timestamp)
 	seriesCommands = append(seriesCommands, seriesCommand)
-	seriesCommand = netmodel.NewSeriesCommand(self.senderHostname, self.metricPrefix+".memstore.series-command.count", netmodel.Int64(self.memstore.SeriesCommandCount())).SetTimestamp(timestamp)
+	seriesCommand = netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.series-commands.count", netmodel.Int64(self.memstore.SeriesCommandCount())).SetTimestamp(timestamp)
 	seriesCommands = append(seriesCommands, seriesCommand)
-	seriesCommand = netmodel.NewSeriesCommand(self.senderHostname, self.metricPrefix+".memstore.size", netmodel.Int64(self.memstore.Size())).SetTimestamp(timestamp)
+	seriesCommand = netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.size", netmodel.Int64(self.memstore.Size())).SetTimestamp(timestamp)
 	seriesCommands = append(seriesCommands, seriesCommand)
 	self.writeCommunicator.PriorSendData(seriesCommands, nil, nil, nil)
 
@@ -116,14 +118,18 @@ func (self *Storage) StartPeriodicSending() {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
 	if !self.isUpdating {
-		schedule(self.updateTask, self.updateInterval)
+		self.stopSelfMetricSendTask = schedule(self.selfMetricSendTask, self.selfMetricSendInterval)
+		self.stopUpdateTask = schedule(self.updateTask, self.updateInterval)
+		self.isUpdating = true
 	}
 }
 func (self *Storage) StopPeriodicSending() {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
 	if self.isUpdating {
+		self.stopSelfMetricSendTask <- true
 		self.stopUpdateTask <- true
+		self.isUpdating = false
 	}
 }
 func (self *Storage) ForceSend() {

@@ -11,7 +11,7 @@
 * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
 * express or implied. See the License for the specific language governing
 * permissions and limitations under the License.
-*/
+ */
 
 package storage
 
@@ -26,30 +26,30 @@ type StorageFactory interface {
 }
 
 type NetworkStorageFactory struct {
-	senderHostname   string
-	metricPrefix     string
-	limit            uint64
-	protocol         string
-	receiverHostport string
-	connectionLimit  uint
-	updateInterval   time.Duration
-	url              *url.URL
-	username         string
-	password         string
+	selfMetricsEntity string
+	metricPrefix      string
+	limit             uint64
+	protocol          string
+	receiverHostport  string
+	connectionLimit   uint
+	updateInterval    time.Duration
+	url               *url.URL
+	username          string
+	password          string
 }
 
-func NewNetworkStorageFactory(senderHostname, protocol, receiverHostport string, url url.URL, username, password string, limit uint64, connectionLimit uint, updateInterval time.Duration, metricPrefix string) *NetworkStorageFactory {
+func NewNetworkStorageFactory(selfMetricsEntity, protocol, receiverHostport string, url url.URL, username, password string, limit uint64, connectionLimit uint, updateInterval time.Duration, metricPrefix string) *NetworkStorageFactory {
 	return &NetworkStorageFactory{
-		senderHostname:   senderHostname,
-		limit:            limit,
-		protocol:         protocol,
-		receiverHostport: receiverHostport,
-		connectionLimit:  connectionLimit,
-		updateInterval:   updateInterval,
-		metricPrefix:     metricPrefix,
-		url:              &url,
-		username:         username,
-		password:         password,
+		selfMetricsEntity: selfMetricsEntity,
+		limit:             limit,
+		protocol:          protocol,
+		receiverHostport:  receiverHostport,
+		connectionLimit:   connectionLimit,
+		updateInterval:    updateInterval,
+		metricPrefix:      metricPrefix,
+		url:               &url,
+		username:          username,
+		password:          password,
 	}
 }
 
@@ -57,34 +57,34 @@ func (self *NetworkStorageFactory) Create() *Storage {
 	memstore := NewMemStore(self.limit)
 	writeCommunicator := NewNetworkCommunicator(self.connectionLimit, self.protocol, self.receiverHostport)
 	storage := &Storage{
-		senderHostname:    self.senderHostname,
-		memstore:          memstore,
-		writeCommunicator: writeCommunicator,
-		updateInterval:    self.updateInterval,
-		isUpdating:        false,
-		metricPrefix:      self.metricPrefix,
-		atsdHttpClient:    http.New(*self.url, self.username, self.password),
+		selfMetricsEntity:      self.selfMetricsEntity,
+		memstore:               memstore,
+		writeCommunicator:      writeCommunicator,
+		updateInterval:         self.updateInterval,
+		selfMetricSendInterval: 15 * time.Second,
+		isUpdating:             false,
+		metricPrefix:           self.metricPrefix,
+		atsdHttpClient:         http.New(*self.url, self.username, self.password),
 	}
-	schedule(storage.selfMetricSendTask, 15*time.Second)
 
 	return storage
 }
 
-func NewHttpStorageFactory(senderHostname string, url url.URL, username, password string, limit uint64, updateInterval time.Duration, metricPrefix string) *HttpStorageFactory {
+func NewHttpStorageFactory(selfMetricsEntity string, url url.URL, username, password string, limit uint64, updateInterval time.Duration, metricPrefix string) *HttpStorageFactory {
 	return &HttpStorageFactory{
-		senderHostname: senderHostname,
-		limit:          limit,
-		url:            &url,
-		username:       username,
-		password:       password,
-		updateInterval: updateInterval,
-		metricPrefix:   metricPrefix,
+		selfMetricsEntity: selfMetricsEntity,
+		limit:             limit,
+		url:               &url,
+		username:          username,
+		password:          password,
+		updateInterval:    updateInterval,
+		metricPrefix:      metricPrefix,
 	}
 }
 
 type HttpStorageFactory struct {
-	senderHostname string
-	limit          uint64
+	selfMetricsEntity string
+	limit             uint64
 
 	url      *url.URL
 	username string
@@ -99,14 +99,14 @@ func (self *HttpStorageFactory) Create() *Storage {
 	client := http.New(*self.url, self.username, self.password)
 	writeCommunicator := NewHttpCommunicator(client)
 	storage := &Storage{
-		senderHostname:    self.senderHostname,
-		memstore:          memstore,
-		writeCommunicator: writeCommunicator,
-		updateInterval:    self.updateInterval,
-		isUpdating:        false,
-		atsdHttpClient:    client,
-		metricPrefix:      self.metricPrefix,
+		selfMetricsEntity:      self.selfMetricsEntity,
+		memstore:               memstore,
+		writeCommunicator:      writeCommunicator,
+		updateInterval:         self.updateInterval,
+		selfMetricSendInterval: 15 * time.Second,
+		isUpdating:             false,
+		atsdHttpClient:         client,
+		metricPrefix:           self.metricPrefix,
 	}
-	schedule(storage.selfMetricSendTask, 15*time.Second)
 	return storage
 }
