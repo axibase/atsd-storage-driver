@@ -28,7 +28,7 @@ type StorageFactory interface {
 type NetworkStorageFactory struct {
 	selfMetricsEntity string
 	metricPrefix      string
-	limit             uint64
+	memstoreLimit     uint64
 	protocol          string
 	receiverHostport  string
 	connectionLimit   uint
@@ -38,10 +38,10 @@ type NetworkStorageFactory struct {
 	password          string
 }
 
-func NewNetworkStorageFactory(selfMetricsEntity, protocol, receiverHostport string, url url.URL, username, password string, limit uint64, connectionLimit uint, updateInterval time.Duration, metricPrefix string) *NetworkStorageFactory {
+func NewNetworkStorageFactory(selfMetricsEntity, protocol, receiverHostport string, url url.URL, username, password string, memstoreLimit uint64, connectionLimit uint, updateInterval time.Duration, metricPrefix string) *NetworkStorageFactory {
 	return &NetworkStorageFactory{
 		selfMetricsEntity: selfMetricsEntity,
-		limit:             limit,
+		memstoreLimit:     memstoreLimit,
 		protocol:          protocol,
 		receiverHostport:  receiverHostport,
 		connectionLimit:   connectionLimit,
@@ -54,7 +54,7 @@ func NewNetworkStorageFactory(selfMetricsEntity, protocol, receiverHostport stri
 }
 
 func (self *NetworkStorageFactory) Create() *Storage {
-	memstore := NewMemStore(self.limit)
+	memstore := NewMemStore(self.memstoreLimit)
 	writeCommunicator := NewNetworkCommunicator(self.connectionLimit, self.protocol, self.receiverHostport)
 	storage := &Storage{
 		selfMetricsEntity:      self.selfMetricsEntity,
@@ -70,10 +70,10 @@ func (self *NetworkStorageFactory) Create() *Storage {
 	return storage
 }
 
-func NewHttpStorageFactory(selfMetricsEntity string, url url.URL, username, password string, limit uint64, updateInterval time.Duration, metricPrefix string) *HttpStorageFactory {
+func NewHttpStorageFactory(selfMetricsEntity string, url url.URL, username, password string, memstoreLimit uint64, updateInterval time.Duration, metricPrefix string) *HttpStorageFactory {
 	return &HttpStorageFactory{
 		selfMetricsEntity: selfMetricsEntity,
-		limit:             limit,
+		memstoreLimit:     memstoreLimit,
 		url:               &url,
 		username:          username,
 		password:          password,
@@ -84,7 +84,7 @@ func NewHttpStorageFactory(selfMetricsEntity string, url url.URL, username, pass
 
 type HttpStorageFactory struct {
 	selfMetricsEntity string
-	limit             uint64
+	memstoreLimit     uint64
 
 	url      *url.URL
 	username string
@@ -95,7 +95,7 @@ type HttpStorageFactory struct {
 }
 
 func (self *HttpStorageFactory) Create() *Storage {
-	memstore := NewMemStore(self.limit)
+	memstore := NewMemStore(self.memstoreLimit)
 	client := http.New(*self.url, self.username, self.password)
 	writeCommunicator := NewHttpCommunicator(client)
 	storage := &Storage{
@@ -109,4 +109,42 @@ func (self *HttpStorageFactory) Create() *Storage {
 		metricPrefix:           self.metricPrefix,
 	}
 	return storage
+}
+
+func NewFactoryFromConfig(config Config) StorageFactory {
+	switch config.Protocol {
+	case "udp", "tcp":
+		return NewNetworkStorageFactory(
+			config.SelfMetricEntity,
+			config.Protocol,
+			config.ReceiverHostport,
+			config.Url,
+			config.Username,
+			config.Password,
+			config.MemstoreLimit,
+			config.ConnectionLimit,
+			config.UpdateInterval,
+			config.MetricPrefix,
+		)
+	case "http/https":
+		return NewHttpStorageFactory(
+			config.SelfMetricEntity,
+			config.Url,
+			config.Username,
+			config.Password,
+			config.MemstoreLimit,
+			config.UpdateInterval,
+			config.MetricPrefix,
+		)
+	default:
+		return NewHttpStorageFactory(
+			config.SelfMetricEntity,
+			config.Url,
+			config.Username,
+			config.Password,
+			config.MemstoreLimit,
+			config.UpdateInterval,
+			config.MetricPrefix,
+		)
+	}
 }
