@@ -58,7 +58,7 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 						err = hc.client.Entities.Create(entity)
 						if err != nil {
 							waitDuration := expBackoff.Duration()
-							glog.Error("Could not send entity update: ", err)
+							glog.Error("Could not send entity update: ", err, "waiting for ", waitDuration)
 							time.Sleep(waitDuration)
 							hc.counters.entityTag.dropped++
 							continue
@@ -73,7 +73,7 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 					err := hc.client.Properties.Insert(properties)
 					if err != nil {
 						waitDuration := expBackoff.Duration()
-						glog.Error("Could not send property: ", err)
+						glog.Error("Could not send property: ", err, "waiting for ", waitDuration)
 						time.Sleep(waitDuration)
 						hc.counters.prop.dropped += uint64(len(properties))
 						continue
@@ -86,7 +86,7 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 					err := hc.client.Messages.Insert(messages)
 					if err != nil {
 						waitDuration := expBackoff.Duration()
-						glog.Error("Could not send message: ", err)
+						glog.Error("Could not send message: ", err, "waiting for ", waitDuration)
 						time.Sleep(waitDuration)
 						hc.counters.messages.dropped += uint64(len(messages))
 						continue
@@ -100,7 +100,7 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 					err := hc.client.Series.Insert(series)
 					if err != nil {
 						waitDuration := expBackoff.Duration()
-						glog.Error("Could not send series: ", err)
+						glog.Error("Could not send series: ", err, "waiting for ", waitDuration)
 						time.Sleep(waitDuration)
 						hc.counters.series.dropped += uint64(len(series))
 						continue

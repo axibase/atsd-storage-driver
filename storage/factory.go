@@ -36,9 +36,22 @@ type NetworkStorageFactory struct {
 	url               *url.URL
 	username          string
 	password          string
+	groupParams       map[string]DeduplicationParams
 }
 
-func NewNetworkStorageFactory(selfMetricsEntity, protocol, receiverHostport string, url url.URL, username, password string, memstoreLimit uint64, connectionLimit uint, updateInterval time.Duration, metricPrefix string) *NetworkStorageFactory {
+func NewNetworkStorageFactory(
+	selfMetricsEntity,
+	protocol,
+	receiverHostport string,
+	url url.URL,
+	username,
+	password string,
+	memstoreLimit uint64,
+	connectionLimit uint,
+	updateInterval time.Duration,
+	metricPrefix string,
+	groupParams map[string]DeduplicationParams,
+) *NetworkStorageFactory {
 	return &NetworkStorageFactory{
 		selfMetricsEntity: selfMetricsEntity,
 		memstoreLimit:     memstoreLimit,
@@ -50,15 +63,21 @@ func NewNetworkStorageFactory(selfMetricsEntity, protocol, receiverHostport stri
 		url:               &url,
 		username:          username,
 		password:          password,
+		groupParams:       groupParams,
 	}
 }
 
 func (self *NetworkStorageFactory) Create() *Storage {
 	memstore := NewMemStore(self.memstoreLimit)
 	writeCommunicator := NewNetworkCommunicator(self.connectionLimit, self.protocol, self.receiverHostport)
+	compactorBuffer := map[string]map[string]sample{}
+	for group := range self.groupParams {
+		compactorBuffer[group] = map[string]sample{}
+	}
 	storage := &Storage{
 		selfMetricsEntity:      self.selfMetricsEntity,
 		memstore:               memstore,
+		dataCompacter:          &DataCompacter{GroupParams: self.groupParams, Buffer: compactorBuffer},
 		writeCommunicator:      writeCommunicator,
 		updateInterval:         self.updateInterval,
 		selfMetricSendInterval: 15 * time.Second,
@@ -70,7 +89,16 @@ func (self *NetworkStorageFactory) Create() *Storage {
 	return storage
 }
 
-func NewHttpStorageFactory(selfMetricsEntity string, url url.URL, username, password string, memstoreLimit uint64, updateInterval time.Duration, metricPrefix string) *HttpStorageFactory {
+func NewHttpStorageFactory(
+	selfMetricsEntity string,
+	url url.URL,
+	username,
+	password string,
+	memstoreLimit uint64,
+	updateInterval time.Duration,
+	metricPrefix string,
+	groupParams map[string]DeduplicationParams,
+) *HttpStorageFactory {
 	return &HttpStorageFactory{
 		selfMetricsEntity: selfMetricsEntity,
 		memstoreLimit:     memstoreLimit,
@@ -79,6 +107,7 @@ func NewHttpStorageFactory(selfMetricsEntity string, url url.URL, username, pass
 		password:          password,
 		updateInterval:    updateInterval,
 		metricPrefix:      metricPrefix,
+		groupParams:       groupParams,
 	}
 }
 
@@ -92,15 +121,21 @@ type HttpStorageFactory struct {
 
 	updateInterval time.Duration
 	metricPrefix   string
+	groupParams    map[string]DeduplicationParams
 }
 
 func (self *HttpStorageFactory) Create() *Storage {
 	memstore := NewMemStore(self.memstoreLimit)
 	client := http.New(*self.url, self.username, self.password)
 	writeCommunicator := NewHttpCommunicator(client)
+	compactorBuffer := map[string]map[string]sample{}
+	for group := range self.groupParams {
+		compactorBuffer[group] = map[string]sample{}
+	}
 	storage := &Storage{
 		selfMetricsEntity:      self.selfMetricsEntity,
 		memstore:               memstore,
+		dataCompacter:          &DataCompacter{GroupParams: self.groupParams, Buffer: compactorBuffer},
 		writeCommunicator:      writeCommunicator,
 		updateInterval:         self.updateInterval,
 		selfMetricSendInterval: 15 * time.Second,
@@ -117,34 +152,37 @@ func NewFactoryFromConfig(config Config) StorageFactory {
 		return NewNetworkStorageFactory(
 			config.SelfMetricEntity,
 			config.Protocol,
-			config.ReceiverHostport,
-			config.Url,
+			config.DataReceiverHostport,
+			*config.Url,
 			config.Username,
 			config.Password,
 			config.MemstoreLimit,
 			config.ConnectionLimit,
 			config.UpdateInterval,
 			config.MetricPrefix,
+			config.GroupParams,
 		)
 	case "http/https":
 		return NewHttpStorageFactory(
 			config.SelfMetricEntity,
-			config.Url,
+			*config.Url,
 			config.Username,
 			config.Password,
 			config.MemstoreLimit,
 			config.UpdateInterval,
 			config.MetricPrefix,
+			config.GroupParams,
 		)
 	default:
 		return NewHttpStorageFactory(
 			config.SelfMetricEntity,
-			config.Url,
+			*config.Url,
 			config.Username,
 			config.Password,
 			config.MemstoreLimit,
 			config.UpdateInterval,
 			config.MetricPrefix,
+			config.GroupParams,
 		)
 	}
 }

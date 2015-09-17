@@ -4,11 +4,13 @@ import (
 	"errors"
 	neturl "net/url"
 	"time"
+	"strings"
+	"strconv"
 )
 
 type Config struct {
 	Url              *neturl.URL
-	ReceiverHostport string
+	DataReceiverHostport string
 	Protocol         string
 	MetricPrefix     string
 	SelfMetricEntity string
@@ -20,13 +22,15 @@ type Config struct {
 	Password string
 
 	UpdateInterval time.Duration
+
+	GroupParams map[string]DeduplicationParams
 }
 
 func GetDefaultConfig() Config {
 	urlStruct, _ := neturl.ParseRequestURI("http://localhost:8088")
 	return Config{
 		Url:              urlStruct,
-		ReceiverHostport: "localhost:8082",
+		DataReceiverHostport: "localhost:8082",
 		Protocol:         "tcp",
 		MetricPrefix:     "storagedriver",
 		SelfMetricEntity: "hostname",
@@ -35,24 +39,12 @@ func GetDefaultConfig() Config {
 		Username:         "admin",
 		Password:         "admin",
 		UpdateInterval:   1 * time.Minute,
+		GroupParams:      map[string]DeduplicationParams{},
 	}
 }
 
 func (self *Config) UnmarshalTOML(data interface{}) error {
 	d, _ := data.(map[string]interface{})
-
-	defaultConf := GetDefaultConfig()
-	self.Url = defaultConf.Url
-	self.ReceiverHostport = defaultConf.ReceiverHostport
-	self.ReceiverHostport = defaultConf.ReceiverHostport
-	self.Protocol = defaultConf.Protocol
-	self.MetricPrefix = defaultConf.MetricPrefix
-	self.SelfMetricEntity = defaultConf.SelfMetricEntity
-	self.ConnectionLimit = defaultConf.ConnectionLimit
-	self.MemstoreLimit = defaultConf.MemstoreLimit
-	self.Username = defaultConf.Username
-	self.Password = defaultConf.Password
-	self.UpdateInterval = defaultConf.UpdateInterval
 
 	if u, ok := d["url"]; ok {
 		urlString, _ := u.(string)
@@ -65,7 +57,7 @@ func (self *Config) UnmarshalTOML(data interface{}) error {
 
 	if wh, ok := d["write_host"]; ok {
 		writeHost, _ := wh.(string)
-		self.ReceiverHostport = writeHost
+		self.DataReceiverHostport = writeHost
 	}
 
 	if p, ok := d["write_protocol"]; ok {
@@ -115,7 +107,38 @@ func (self *Config) UnmarshalTOML(data interface{}) error {
 			return errors.New("unknown update_interval format")
 		}
 		self.UpdateInterval = duration
+	}
 
+	if self.GroupParams == nil {
+		self.GroupParams = map[string]DeduplicationParams{}
+	}
+	if g, ok := d["deduplication"]; ok {
+		groups, _ := g.(map[string]interface{})
+		for key, val := range groups {
+			m := val.(map[string]interface{})
+			thresholdString, _ := m["threshold"].(string)
+			var threshold interface{}
+			if strings.HasSuffix(thresholdString, "%") {
+				val, err := strconv.ParseFloat(strings.TrimSuffix(thresholdString, "%"), 64)
+				if err != nil {
+					panic(err)
+				}
+				threshold = Percent(val)
+			} else {
+				val, err := strconv.ParseFloat(thresholdString, 64)
+				if err != nil {
+					panic(err)
+				}
+				threshold = Absolute(val)
+			}
+
+			intervalString, _ := m["interval"].(string)
+			interval, err := time.ParseDuration(intervalString)
+			if err != nil {
+				return err
+			}
+			self.GroupParams[key] = DeduplicationParams{Threshold: threshold, Interval: interval}
+		}
 	}
 
 	return nil

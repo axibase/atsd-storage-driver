@@ -48,6 +48,7 @@ type Storage struct {
 	metricPrefix      string
 
 	memstore          *MemStore
+	dataCompacter     *DataCompacter
 	writeCommunicator IWriteCommunicator
 
 	atsdHttpClient *http.Client
@@ -97,8 +98,9 @@ func (self *Storage) selfMetricSendTask() {
 
 }
 
-func (self *Storage) SendSeriesCommands(seriesCommands []*netmodel.SeriesCommand) {
-	self.memstore.AppendSeriesCommands(seriesCommands)
+func (self *Storage) SendSeriesCommands(group string, seriesCommands []*netmodel.SeriesCommand) {
+	filteredSeriesCommands := self.dataCompacter.Filter(group, seriesCommands)
+	self.memstore.AppendSeriesCommands(filteredSeriesCommands)
 }
 func (self *Storage) SendPropertyCommands(propertyCommands []*netmodel.PropertyCommand) {
 	self.memstore.AppendPropertyCommands(propertyCommands)
