@@ -17,9 +17,8 @@ package storage
 
 import (
 	"container/list"
-	"github.com/axibase/atsd-api-go/net/http"
-	httpmodel "github.com/axibase/atsd-api-go/net/http/model"
-	netmodel "github.com/axibase/atsd-api-go/net/model"
+	"github.com/axibase/atsd-api-go/http"
+	"github.com/axibase/atsd-api-go/net"
 	"sync"
 	"time"
 )
@@ -27,7 +26,7 @@ import (
 type metricValue struct {
 	name  string
 	tags  map[string]string
-	value netmodel.Number
+	value net.Number
 }
 
 type Chunk struct {
@@ -39,8 +38,8 @@ func NewChunk() *Chunk {
 }
 
 type IWriteCommunicator interface {
-	QueuedSendData(seriesCommandsChunk []*Chunk, entityTagCommands []*netmodel.EntityTagCommand, properties []*netmodel.PropertyCommand, messages []*netmodel.MessageCommand)
-	PriorSendData(seriesCommands []*netmodel.SeriesCommand, entityTagCommands []*netmodel.EntityTagCommand, propertyCommands []*netmodel.PropertyCommand, messageCommands []*netmodel.MessageCommand)
+	QueuedSendData(seriesCommandsChunk []*Chunk, entityTagCommands []*net.EntityTagCommand, properties []*net.PropertyCommand, messages []*net.MessageCommand)
+	PriorSendData(seriesCommands []*net.SeriesCommand, entityTagCommands []*net.EntityTagCommand, propertyCommands []*net.PropertyCommand, messageCommands []*net.MessageCommand)
 	SelfMetricValues() []*metricValue
 }
 type Storage struct {
@@ -71,12 +70,12 @@ func (self *Storage) updateTask() {
 
 }
 func (self *Storage) selfMetricSendTask() {
-	timestamp := netmodel.Millis(time.Now().UnixNano() / 1e6)
+	timestamp := net.Millis(time.Now().UnixNano() / 1e6)
 	writeCommunicatorMetricValues := self.writeCommunicator.SelfMetricValues()
 
-	seriesCommands := []*netmodel.SeriesCommand{}
+	seriesCommands := []*net.SeriesCommand{}
 	for _, metricValue := range writeCommunicatorMetricValues {
-		seriesCommand := netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+"."+metricValue.name, metricValue.value).
+		seriesCommand := net.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+"."+metricValue.name, metricValue.value).
 			SetTimestamp(timestamp)
 		for name, val := range metricValue.tags {
 			seriesCommand.SetTag(name, val)
@@ -84,35 +83,35 @@ func (self *Storage) selfMetricSendTask() {
 		seriesCommands = append(seriesCommands, seriesCommand)
 	}
 
-	seriesCommand := netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.entities.count", netmodel.Int64(self.memstore.EntitiesCount())).SetTimestamp(timestamp)
+	seriesCommand := net.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.entities.count", net.Int64(self.memstore.EntitiesCount())).SetTimestamp(timestamp)
 	seriesCommands = append(seriesCommands, seriesCommand)
-	seriesCommand = netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.messages.count", netmodel.Int64(self.memstore.MessagesCount())).SetTimestamp(timestamp)
+	seriesCommand = net.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.messages.count", net.Int64(self.memstore.MessagesCount())).SetTimestamp(timestamp)
 	seriesCommands = append(seriesCommands, seriesCommand)
-	seriesCommand = netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.properties.count", netmodel.Int64(self.memstore.PropertiesCount())).SetTimestamp(timestamp)
+	seriesCommand = net.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.properties.count", net.Int64(self.memstore.PropertiesCount())).SetTimestamp(timestamp)
 	seriesCommands = append(seriesCommands, seriesCommand)
-	seriesCommand = netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.series-commands.count", netmodel.Int64(self.memstore.SeriesCommandCount())).SetTimestamp(timestamp)
+	seriesCommand = net.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.series-commands.count", net.Int64(self.memstore.SeriesCommandCount())).SetTimestamp(timestamp)
 	seriesCommands = append(seriesCommands, seriesCommand)
-	seriesCommand = netmodel.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.size", netmodel.Int64(self.memstore.Size())).SetTimestamp(timestamp)
+	seriesCommand = net.NewSeriesCommand(self.selfMetricsEntity, self.metricPrefix+".memstore.size", net.Int64(self.memstore.Size())).SetTimestamp(timestamp)
 	seriesCommands = append(seriesCommands, seriesCommand)
 	self.writeCommunicator.PriorSendData(seriesCommands, nil, nil, nil)
 
 }
 
-func (self *Storage) SendSeriesCommands(group string, seriesCommands []*netmodel.SeriesCommand) {
+func (self *Storage) SendSeriesCommands(group string, seriesCommands []*net.SeriesCommand) {
 	filteredSeriesCommands := self.dataCompacter.Filter(group, seriesCommands)
 	self.memstore.AppendSeriesCommands(filteredSeriesCommands)
 }
-func (self *Storage) SendPropertyCommands(propertyCommands []*netmodel.PropertyCommand) {
+func (self *Storage) SendPropertyCommands(propertyCommands []*net.PropertyCommand) {
 	self.memstore.AppendPropertyCommands(propertyCommands)
 }
-func (self *Storage) SendEntityTagCommands(entityTagCommands []*netmodel.EntityTagCommand) {
+func (self *Storage) SendEntityTagCommands(entityTagCommands []*net.EntityTagCommand) {
 	self.memstore.AppendEntityTagCommands(entityTagCommands)
 }
-func (self *Storage) SendMessageCommands(messageCommands []*netmodel.MessageCommand) {
+func (self *Storage) SendMessageCommands(messageCommands []*net.MessageCommand) {
 	self.memstore.AppendMessageCommands(messageCommands)
 }
 
-func (self *Storage) RegisterMetric(metric *httpmodel.Metric) error {
+func (self *Storage) RegisterMetric(metric *http.Metric) error {
 	return self.atsdHttpClient.Metric.CreateOrReplace(metric)
 }
 

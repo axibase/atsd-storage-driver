@@ -16,9 +16,8 @@
 package storage
 
 import (
-	"github.com/axibase/atsd-api-go/net/http"
-	httpmodel "github.com/axibase/atsd-api-go/net/http/model"
-	netmodel "github.com/axibase/atsd-api-go/net/model"
+	"github.com/axibase/atsd-api-go/http"
+	"github.com/axibase/atsd-api-go/net"
 	"github.com/golang/glog"
 	"time"
 )
@@ -27,9 +26,9 @@ type HttpCommunicator struct {
 	client *http.Client
 
 	seriesCommandsChunkChan chan *Chunk
-	propertyCommands        chan []*netmodel.PropertyCommand
-	entityTag               chan []*netmodel.EntityTagCommand
-	messageCommands         chan []*netmodel.MessageCommand
+	propertyCommands        chan []*net.PropertyCommand
+	entityTag               chan []*net.EntityTagCommand
+	messageCommands         chan []*net.MessageCommand
 	counters                *httpCounters
 }
 
@@ -41,9 +40,9 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 	hc := &HttpCommunicator{
 		client:                  client,
 		seriesCommandsChunkChan: make(chan *Chunk),
-		propertyCommands:        make(chan []*netmodel.PropertyCommand),
-		entityTag:               make(chan []*netmodel.EntityTagCommand),
-		messageCommands:         make(chan []*netmodel.MessageCommand),
+		propertyCommands:        make(chan []*net.PropertyCommand),
+		entityTag:               make(chan []*net.EntityTagCommand),
+		messageCommands:         make(chan []*net.MessageCommand),
 		counters:                &httpCounters{},
 	}
 	go func() {
@@ -115,7 +114,7 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 	return hc
 }
 
-func (self *HttpCommunicator) QueuedSendData(seriesCommandsChunk []*Chunk, entityTagCommands []*netmodel.EntityTagCommand, propertyCommands []*netmodel.PropertyCommand, messageCommands []*netmodel.MessageCommand) {
+func (self *HttpCommunicator) QueuedSendData(seriesCommandsChunk []*Chunk, entityTagCommands []*net.EntityTagCommand, propertyCommands []*net.PropertyCommand, messageCommands []*net.MessageCommand) {
 	self.propertyCommands <- propertyCommands
 
 	self.entityTag <- entityTagCommands
@@ -127,7 +126,7 @@ func (self *HttpCommunicator) QueuedSendData(seriesCommandsChunk []*Chunk, entit
 	}
 }
 
-func (self *HttpCommunicator) PriorSendData(seriesCommands []*netmodel.SeriesCommand, entityTagCommands []*netmodel.EntityTagCommand, propertyCommands []*netmodel.PropertyCommand, messageCommands []*netmodel.MessageCommand) {
+func (self *HttpCommunicator) PriorSendData(seriesCommands []*net.SeriesCommand, entityTagCommands []*net.EntityTagCommand, propertyCommands []*net.PropertyCommand, messageCommands []*net.MessageCommand) {
 	entities := entityTagCommandsToEntities(entityTagCommands)
 	for _, entity := range entities {
 		err := self.client.Entities.Update(entity)
@@ -161,62 +160,62 @@ func (self *HttpCommunicator) SelfMetricValues() []*metricValue {
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: netmodel.Int64(self.counters.series.sent),
+			value: net.Int64(self.counters.series.sent),
 		},
 		&metricValue{
 			name: "series-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: netmodel.Int64(self.counters.series.dropped),
+			value: net.Int64(self.counters.series.dropped),
 		},
 		&metricValue{
 			name: "message-commands.sent",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: netmodel.Int64(self.counters.messages.sent),
+			value: net.Int64(self.counters.messages.sent),
 		},
 		&metricValue{
 			name: "message-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: netmodel.Int64(self.counters.messages.dropped),
+			value: net.Int64(self.counters.messages.dropped),
 		},
 		&metricValue{
 			name: "property-commands.sent",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: netmodel.Int64(self.counters.prop.sent),
+			value: net.Int64(self.counters.prop.sent),
 		},
 		&metricValue{
 			name: "property-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: netmodel.Int64(self.counters.prop.dropped),
+			value: net.Int64(self.counters.prop.dropped),
 		},
 		&metricValue{
 			name: "entitytag-commands.sent",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: netmodel.Int64(self.counters.entityTag.sent),
+			value: net.Int64(self.counters.entityTag.sent),
 		},
 		&metricValue{
 			name: "entitytag-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: netmodel.Int64(self.counters.entityTag.dropped),
+			value: net.Int64(self.counters.entityTag.dropped),
 		},
 	}
 }
 
-func seriesCommandsToSeries(seriesCommands []*netmodel.SeriesCommand) []*httpmodel.Series {
-	series := []*httpmodel.Series{}
+func seriesCommandsToSeries(seriesCommands []*net.SeriesCommand) []*http.Series {
+	series := []*http.Series{}
 
 	for _, command := range seriesCommands {
 		metrics := command.Metrics()
@@ -226,27 +225,42 @@ func seriesCommandsToSeries(seriesCommands []*netmodel.SeriesCommand) []*httpmod
 		}
 		tags := command.Tags()
 		for key, val := range metrics {
-			series = append(series, httpmodel.NewSeries(command.Entity(), key).AddSample(*timestamp, val).SetTags(tags))
+			series = append(series,
+				&http.Series{
+					Entity: command.Entity(),
+					Metric: key,
+					Tags:   tags,
+					Data: []*http.Sample{
+						{
+							T: *timestamp,
+							V: val,
+						},
+					},
+				})
 		}
 	}
 	return series
 }
-func seriesCommandsChunkToSeries(seriesCommandsChunk *Chunk) []*httpmodel.Series {
-	series := []*httpmodel.Series{}
+func seriesCommandsChunkToSeries(seriesCommandsChunk *Chunk) []*http.Series {
+	series := []*http.Series{}
 	if seriesCommandsChunk.Len() > 0 {
-		seriesMap := map[string]*httpmodel.Series{}
+		seriesMap := map[string]*http.Series{}
 		for el := seriesCommandsChunk.Front(); el != nil; el = seriesCommandsChunk.Front() {
-			seriesCommand := *el.Value.(*netmodel.SeriesCommand)
+			seriesCommand := *el.Value.(*net.SeriesCommand)
 			metrics := seriesCommand.Metrics()
 			tags := seriesCommand.Tags()
 			for key, val := range metrics {
 				if _, ok := seriesMap[key]; !ok {
-					seriesMap[key] = httpmodel.NewSeries(seriesCommand.Entity(), key).SetTags(tags)
+					seriesMap[key] = &http.Series{
+						Entity: seriesCommand.Entity(),
+						Metric: key,
+						Tags:   tags,
+					}
 				}
 				if seriesCommand.Timestamp() == nil {
 					panic("Nil timestamp!")
 				}
-				seriesMap[key].AddSample(*seriesCommand.Timestamp(), val)
+				seriesMap[key].Data = append(seriesMap[key].Data, &http.Sample{T: *seriesCommand.Timestamp(), V: val})
 			}
 			seriesCommandsChunk.Remove(el)
 		}
@@ -256,11 +270,11 @@ func seriesCommandsChunkToSeries(seriesCommandsChunk *Chunk) []*httpmodel.Series
 	}
 	return series
 }
-func entityTagCommandsToEntities(entityTagCommands []*netmodel.EntityTagCommand) []*httpmodel.Entity {
-	entities := []*httpmodel.Entity{}
+func entityTagCommandsToEntities(entityTagCommands []*net.EntityTagCommand) []*http.Entity {
+	entities := []*http.Entity{}
 
 	for _, command := range entityTagCommands {
-		entity := httpmodel.NewEntity(command.Entity())
+		entity := http.NewEntity(command.Entity())
 		for key, value := range command.Tags() {
 			entity.SetTag(key, value)
 		}
@@ -268,10 +282,10 @@ func entityTagCommandsToEntities(entityTagCommands []*netmodel.EntityTagCommand)
 	}
 	return entities
 }
-func propertyCommandsToProperties(propertyCommands []*netmodel.PropertyCommand) []*httpmodel.Property {
-	properties := []*httpmodel.Property{}
+func propertyCommandsToProperties(propertyCommands []*net.PropertyCommand) []*http.Property {
+	properties := []*http.Property{}
 	for _, propertyCommand := range propertyCommands {
-		property := httpmodel.NewProperty(propertyCommand.PropType(), propertyCommand.Entity()).
+		property := http.NewProperty(propertyCommand.PropType(), propertyCommand.Entity()).
 			SetKey(propertyCommand.Key()).
 			SetAllTags(propertyCommand.Tags())
 		if propertyCommand.Timestamp() != nil {
@@ -282,14 +296,14 @@ func propertyCommandsToProperties(propertyCommands []*netmodel.PropertyCommand) 
 	}
 	return properties
 }
-func messageCommandsToProperties(messageCommands []*netmodel.MessageCommand) []*httpmodel.Message {
-	messages := []*httpmodel.Message{}
+func messageCommandsToProperties(messageCommands []*net.MessageCommand) []*http.Message {
+	messages := []*http.Message{}
 	for _, messageCommand := range messageCommands {
-		message := httpmodel.NewMessage(messageCommand.Entity()).
+		message := http.NewMessage(messageCommand.Entity()).
 			SetMessage(messageCommand.Message())
 		for key, val := range messageCommand.Tags() {
 			if key == "severity" {
-				message.SetSeverity(httpmodel.Severity(val))
+				message.SetSeverity(http.Severity(val))
 			}
 			if key == "source" {
 				message.SetSource(val)

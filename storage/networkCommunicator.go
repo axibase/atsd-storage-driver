@@ -17,7 +17,6 @@ package storage
 
 import (
 	"github.com/axibase/atsd-api-go/net"
-	netmodel "github.com/axibase/atsd-api-go/net/model"
 	"github.com/golang/glog"
 	"strconv"
 	"time"
@@ -34,9 +33,9 @@ type counters struct {
 
 type NetworkCommunicator struct {
 	seriesCommandsChunkChan chan *Chunk
-	properties              chan []*netmodel.PropertyCommand
-	messageCommands         chan []*netmodel.MessageCommand
-	entityTag               chan []*netmodel.EntityTagCommand
+	properties              chan []*net.PropertyCommand
+	messageCommands         chan []*net.MessageCommand
+	entityTag               chan []*net.EntityTagCommand
 
 	protocol string
 	hostport string
@@ -52,9 +51,9 @@ func NewNetworkCommunicator(connectionLimit uint, protocol, hostport string) *Ne
 		hostport:                hostport,
 		connectionLimit:         connectionLimit,
 		seriesCommandsChunkChan: make(chan *Chunk, seriesCommandsChunkChannelBufferSize),
-		properties:              make(chan []*netmodel.PropertyCommand),
-		messageCommands:         make(chan []*netmodel.MessageCommand),
-		entityTag:               make(chan []*netmodel.EntityTagCommand),
+		properties:              make(chan []*net.PropertyCommand),
+		messageCommands:         make(chan []*net.MessageCommand),
+		entityTag:               make(chan []*net.EntityTagCommand),
 		counters:                make([]*counters, connectionLimit, connectionLimit),
 	}
 
@@ -112,7 +111,7 @@ func NewNetworkCommunicator(connectionLimit uint, protocol, hostport string) *Ne
 						}
 					case seriesChunk := <-nc.seriesCommandsChunkChan:
 						for el := seriesChunk.Front(); el != nil; el = seriesChunk.Front() {
-							err := conn.Series(el.Value.(*netmodel.SeriesCommand))
+							err := conn.Series(el.Value.(*net.SeriesCommand))
 							if err != nil {
 								glog.Error("Thread ", threadNum, " could not send series command: ", err)
 								conn.Close()
@@ -132,7 +131,7 @@ func NewNetworkCommunicator(connectionLimit uint, protocol, hostport string) *Ne
 	return nc
 }
 
-func (self *NetworkCommunicator) QueuedSendData(seriesCommandsChunk []*Chunk, entityTagCommands []*netmodel.EntityTagCommand, properties []*netmodel.PropertyCommand, messageCommands []*netmodel.MessageCommand) {
+func (self *NetworkCommunicator) QueuedSendData(seriesCommandsChunk []*Chunk, entityTagCommands []*net.EntityTagCommand, properties []*net.PropertyCommand, messageCommands []*net.MessageCommand) {
 	self.entityTag <- entityTagCommands
 
 	self.properties <- properties
@@ -144,7 +143,7 @@ func (self *NetworkCommunicator) QueuedSendData(seriesCommandsChunk []*Chunk, en
 	}
 }
 
-func (self *NetworkCommunicator) PriorSendData(seriesCommands []*netmodel.SeriesCommand, entityTagCommands []*netmodel.EntityTagCommand, propertyCommands []*netmodel.PropertyCommand, messageCommands []*netmodel.MessageCommand) {
+func (self *NetworkCommunicator) PriorSendData(seriesCommands []*net.SeriesCommand, entityTagCommands []*net.EntityTagCommand, propertyCommands []*net.PropertyCommand, messageCommands []*net.MessageCommand) {
 	conn, err := net.DialTimeout(self.protocol, self.hostport, 1*time.Second, 1)
 	if err != nil {
 		glog.Error("Could not init connection to prior send self metrics", err)
@@ -189,7 +188,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: netmodel.Int64(self.counters[i].series.sent),
+				value: net.Int64(self.counters[i].series.sent),
 			},
 			&metricValue{
 				name: "series-commands.dropped",
@@ -197,7 +196,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: netmodel.Int64(self.counters[i].series.dropped),
+				value: net.Int64(self.counters[i].series.dropped),
 			},
 			&metricValue{
 				name: "message-commands.sent",
@@ -205,7 +204,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: netmodel.Int64(self.counters[i].messages.sent),
+				value: net.Int64(self.counters[i].messages.sent),
 			},
 			&metricValue{
 				name: "message-commands.dropped",
@@ -213,7 +212,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: netmodel.Int64(self.counters[i].messages.dropped),
+				value: net.Int64(self.counters[i].messages.dropped),
 			},
 			&metricValue{
 				name: "property-commands.sent",
@@ -221,7 +220,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: netmodel.Int64(self.counters[i].prop.sent),
+				value: net.Int64(self.counters[i].prop.sent),
 			},
 			&metricValue{
 				name: "property-commands.dropped",
@@ -229,7 +228,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: netmodel.Int64(self.counters[i].prop.dropped),
+				value: net.Int64(self.counters[i].prop.dropped),
 			},
 			&metricValue{
 				name: "entitytag-commands.sent",
@@ -237,7 +236,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: netmodel.Int64(self.counters[i].entityTag.sent),
+				value: net.Int64(self.counters[i].entityTag.sent),
 			},
 			&metricValue{
 				name: "entitytag-commands.dropped",
@@ -245,7 +244,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: netmodel.Int64(self.counters[i].entityTag.dropped),
+				value: net.Int64(self.counters[i].entityTag.dropped),
 			},
 		)
 	}

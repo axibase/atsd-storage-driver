@@ -16,7 +16,7 @@
 package storage
 
 import (
-	"github.com/axibase/atsd-api-go/net/http"
+	"github.com/axibase/atsd-api-go/http"
 	"net/url"
 	"time"
 )

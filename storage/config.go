@@ -3,17 +3,17 @@ package storage
 import (
 	"errors"
 	neturl "net/url"
-	"time"
-	"strings"
 	"strconv"
+	"strings"
+	"time"
 )
 
 type Config struct {
-	Url              *neturl.URL
+	Url                  *neturl.URL
 	DataReceiverHostport string
-	Protocol         string
-	MetricPrefix     string
-	SelfMetricEntity string
+	Protocol             string
+	MetricPrefix         string
+	SelfMetricEntity     string
 
 	ConnectionLimit uint
 	MemstoreLimit   uint64
@@ -29,17 +29,17 @@ type Config struct {
 func GetDefaultConfig() Config {
 	urlStruct, _ := neturl.ParseRequestURI("http://localhost:8088")
 	return Config{
-		Url:              urlStruct,
+		Url:                  urlStruct,
 		DataReceiverHostport: "localhost:8082",
-		Protocol:         "tcp",
-		MetricPrefix:     "storagedriver",
-		SelfMetricEntity: "hostname",
-		ConnectionLimit:  uint(1),
-		MemstoreLimit:    uint64(1000000),
-		Username:         "admin",
-		Password:         "admin",
-		UpdateInterval:   1 * time.Minute,
-		GroupParams:      map[string]DeduplicationParams{},
+		Protocol:             "tcp",
+		MetricPrefix:         "storagedriver",
+		SelfMetricEntity:     "hostname",
+		ConnectionLimit:      uint(1),
+		MemstoreLimit:        uint64(1000000),
+		Username:             "admin",
+		Password:             "admin",
+		UpdateInterval:       1 * time.Minute,
+		GroupParams:          map[string]DeduplicationParams{},
 	}
 }
 

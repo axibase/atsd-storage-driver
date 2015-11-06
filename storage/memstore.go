@@ -16,7 +16,7 @@
 package storage
 
 import (
-	"github.com/axibase/atsd-api-go/net/model"
+	"github.com/axibase/atsd-api-go/net"
 	"sort"
 	"sync"
 )
@@ -24,11 +24,11 @@ import (
 type MemStore struct {
 	seriesCommandMap *map[string]*Chunk
 
-	properties []*model.PropertyCommand
+	properties []*net.PropertyCommand
 
-	messages []*model.MessageCommand
+	messages []*net.MessageCommand
 
-	entityTagCommands []*model.EntityTagCommand
+	entityTagCommands []*net.EntityTagCommand
 
 	sync.Mutex
 
@@ -42,7 +42,7 @@ func NewMemStore(limit uint64) *MemStore {
 	}
 	return ms
 }
-func (self *MemStore) AppendSeriesCommands(commands []*model.SeriesCommand) {
+func (self *MemStore) AppendSeriesCommands(commands []*net.SeriesCommand) {
 	self.Lock()
 	defer self.Unlock()
 	if uint64(self.Size()) < self.Limit {
@@ -55,21 +55,21 @@ func (self *MemStore) AppendSeriesCommands(commands []*model.SeriesCommand) {
 		}
 	}
 }
-func (self *MemStore) AppendPropertyCommands(propertyCommands []*model.PropertyCommand) {
+func (self *MemStore) AppendPropertyCommands(propertyCommands []*net.PropertyCommand) {
 	self.Lock()
 	defer self.Unlock()
 	if uint64(self.Size()) < self.Limit {
 		self.properties = append(self.properties, propertyCommands...)
 	}
 }
-func (self *MemStore) AppendEntityTagCommands(entityUpdateCommands []*model.EntityTagCommand) {
+func (self *MemStore) AppendEntityTagCommands(entityUpdateCommands []*net.EntityTagCommand) {
 	self.Lock()
 	defer self.Unlock()
 	if uint64(self.Size()) < self.Limit {
 		self.entityTagCommands = append(self.entityTagCommands, entityUpdateCommands...)
 	}
 }
-func (self *MemStore) AppendMessageCommands(messageCommands []*model.MessageCommand) {
+func (self *MemStore) AppendMessageCommands(messageCommands []*net.MessageCommand) {
 	self.Lock()
 	defer self.Unlock()
 	if uint64(self.Size()) < self.Limit {
@@ -89,14 +89,14 @@ func (self *MemStore) ReleaseSeriesCommandChunks() []*Chunk {
 	}
 	return seriesCommandsChunks
 }
-func (self *MemStore) ReleaseProperties() []*model.PropertyCommand {
+func (self *MemStore) ReleaseProperties() []*net.PropertyCommand {
 	self.Lock()
 	defer self.Unlock()
 	properties := self.properties
 	self.properties = nil
 	return properties
 }
-func (self *MemStore) ReleaseEntityTagCommands() []*model.EntityTagCommand {
+func (self *MemStore) ReleaseEntityTagCommands() []*net.EntityTagCommand {
 	self.Lock()
 	defer self.Unlock()
 	entityTagCommands := self.entityTagCommands
@@ -128,7 +128,7 @@ func (self *MemStore) Size() uint64 {
 	return self.EntitiesCount() + self.PropertiesCount() + self.SeriesCommandCount() + self.MessagesCount()
 }
 
-func (self *MemStore) getKey(sc *model.SeriesCommand) string {
+func (self *MemStore) getKey(sc *net.SeriesCommand) string {
 	key := sc.Entity()
 	metrics := []string{}
 	for metricName := range sc.Metrics() {
@@ -151,7 +151,7 @@ func (self *MemStore) getKey(sc *model.SeriesCommand) string {
 	return key
 }
 
-func (self *MemStore) ReleaseMessageCommands() []*model.MessageCommand {
+func (self *MemStore) ReleaseMessageCommands() []*net.MessageCommand {
 	self.Lock()
 	defer self.Unlock()
 	messages := self.messages
