@@ -141,6 +141,7 @@ func schedule(task func(), updateInterval time.Duration) chan bool {
 	stop := make(chan bool)
 	go func() {
 		ticker := time.NewTicker(updateInterval)
+		task()
 		for {
 			select {
 			case <-ticker.C:
