@@ -21,6 +21,9 @@ import (
 	"time"
 )
 
+const MaxDuration time.Duration = 1<<63 - 1
+const maxPowerBeforeOverflow = 62
+
 type ExpBackoff struct {
 	counter  int
 	limit    time.Duration
@@ -34,11 +37,15 @@ func NewExpBackoff(timespan, limit time.Duration) *ExpBackoff {
 	return &ExpBackoff{counter: 1, limit: limit, timespan: timespan, randGen: randGen}
 }
 func (self *ExpBackoff) Duration() time.Duration {
-	maxRand := int(math.Pow(2, float64(self.counter)))
-	self.counter++
-	duration := time.Duration(self.randGen.Intn(maxRand)) * self.timespan
-	if duration > self.limit {
-		duration = self.limit
+	var maxRand int64 = math.MaxInt64
+	if self.counter <= maxPowerBeforeOverflow {
+		maxRand = int64(math.Pow(2, float64(self.counter)))
+		self.counter++
+	}
+	randNumber := self.randGen.Int63n(maxRand)
+	duration := self.limit
+	if time.Duration(randNumber) <= self.limit/self.timespan {
+		duration = time.Duration(randNumber) * self.timespan
 	}
 	return duration
 }
