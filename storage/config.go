@@ -3,23 +3,21 @@ package storage
 import (
 	"errors"
 	neturl "net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 )
 
 type Config struct {
-	Url                  *neturl.URL
-	DataReceiverHostport string
-	Protocol             string
-	MetricPrefix         string
-	SelfMetricEntity     string
+	Url              *neturl.URL
+	MetricPrefix     string
+	SelfMetricEntity string
 
 	ConnectionLimit uint
 	MemstoreLimit   uint
 
-	Username string
-	Password string
+	InsecureSkipVerify bool
 
 	UpdateInterval time.Duration
 
@@ -27,19 +25,20 @@ type Config struct {
 }
 
 func GetDefaultConfig() Config {
-	urlStruct, _ := neturl.ParseRequestURI("http://localhost:8088")
+	urlStruct := &neturl.URL{
+		Scheme: "tcp",
+		User:   neturl.UserPassword("admin", "admin"),
+		Host:   "localhost:8081",
+	}
+	hostname, _ := os.Hostname()
 	return Config{
-		Url:                  urlStruct,
-		DataReceiverHostport: "localhost:8082",
-		Protocol:             "tcp",
-		MetricPrefix:         "storagedriver",
-		SelfMetricEntity:     "hostname",
-		ConnectionLimit:      1,
-		MemstoreLimit:        1000000,
-		Username:             "admin",
-		Password:             "admin",
-		UpdateInterval:       1 * time.Minute,
-		GroupParams:          map[string]DeduplicationParams{},
+		Url:              urlStruct,
+		MetricPrefix:     "storagedriver",
+		SelfMetricEntity: hostname,
+		ConnectionLimit:  1,
+		MemstoreLimit:    1000000,
+		UpdateInterval:   1 * time.Minute,
+		GroupParams:      map[string]DeduplicationParams{},
 	}
 }
 
@@ -55,22 +54,10 @@ func (self *Config) UnmarshalTOML(data interface{}) error {
 		self.Url = url
 	}
 
-	if wh, ok := d["write_host"]; ok {
-		writeHost, _ := wh.(string)
-		self.DataReceiverHostport = writeHost
+	if isv, ok := d["skip_verify"]; ok {
+		InsecureSkipVerify, _ := isv.(bool)
+		self.InsecureSkipVerify = InsecureSkipVerify
 	}
-
-	if p, ok := d["write_protocol"]; ok {
-		protocol, _ := p.(string)
-		switch protocol {
-		case "tcp", "udp", "http/https":
-			self.Protocol = protocol
-		default:
-			return errors.New("Unknown protocol type")
-		}
-
-	}
-
 	if mp, ok := d["metric_prefix"]; ok {
 		metricPrefix, _ := mp.(string)
 		self.MetricPrefix = metricPrefix
@@ -89,15 +76,6 @@ func (self *Config) UnmarshalTOML(data interface{}) error {
 	if ml, ok := d["memstore_limit"]; ok {
 		memstoreLimit, _ := ml.(int64)
 		self.MemstoreLimit = uint(memstoreLimit)
-	}
-
-	if u, ok := d["username"]; ok {
-		username, _ := u.(string)
-		self.Username = username
-	}
-	if p, ok := d["password"]; ok {
-		password, _ := p.(string)
-		self.Password = password
 	}
 
 	if ui, ok := d["update_interval"]; ok {

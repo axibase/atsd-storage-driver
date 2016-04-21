@@ -17,7 +17,6 @@ package storage
 
 import (
 	"container/list"
-	"github.com/axibase/atsd-api-go/http"
 	"github.com/axibase/atsd-api-go/net"
 	"sync"
 	"time"
@@ -49,8 +48,6 @@ type Storage struct {
 	memstore          *MemStore
 	dataCompacter     *DataCompacter
 	writeCommunicator IWriteCommunicator
-
-	atsdHttpClient *http.Client
 
 	isUpdating             bool
 	updateInterval         time.Duration
@@ -109,10 +106,6 @@ func (self *Storage) SendEntityTagCommands(entityTagCommands []*net.EntityTagCom
 }
 func (self *Storage) SendMessageCommands(messageCommands []*net.MessageCommand) {
 	self.memstore.AppendMessageCommands(messageCommands)
-}
-
-func (self *Storage) RegisterMetric(metric *http.Metric) error {
-	return self.atsdHttpClient.Metric.CreateOrReplace(metric)
 }
 
 func (self *Storage) StartPeriodicSending() {

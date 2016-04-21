@@ -137,74 +137,82 @@ func (self *HttpCommunicator) PriorSendData(seriesCommands []*net.SeriesCommand,
 			}
 		}
 	}
-	properties := propertyCommandsToProperties(propertyCommands)
-	err := self.client.Properties.Insert(properties)
-	if err != nil {
-		glog.Error("Could not prior send property: ", err)
+	if len(propertyCommands) > 0 {
+		properties := propertyCommandsToProperties(propertyCommands)
+		err := self.client.Properties.Insert(properties)
+		if err != nil {
+			glog.Error("Could not prior send property: ", err)
+		}
 	}
-	series := seriesCommandsToSeries(seriesCommands)
-	err = self.client.Series.Insert(series)
-	if err != nil {
-		glog.Error("Could not prior send series: ", err)
+
+	if len(seriesCommands) > 0 {
+		series := seriesCommandsToSeries(seriesCommands)
+		err := self.client.Series.Insert(series)
+		if err != nil {
+			glog.Error("Could not prior send series: ", err)
+		}
 	}
-	messages := messageCommandsToProperties(messageCommands)
-	err = self.client.Messages.Insert(messages)
-	if err != nil {
-		glog.Error("Could not prior send message: ", err)
+
+	if len(messageCommands) > 0 {
+		messages := messageCommandsToProperties(messageCommands)
+		err := self.client.Messages.Insert(messages)
+		if err != nil {
+			glog.Error("Could not prior send message: ", err)
+		}
 	}
 }
 func (self *HttpCommunicator) SelfMetricValues() []*metricValue {
 	return []*metricValue{
-		&metricValue{
+		{
 			name: "series-commands.sent",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
 			value: net.Int64(self.counters.series.sent),
 		},
-		&metricValue{
+		{
 			name: "series-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
 			value: net.Int64(self.counters.series.dropped),
 		},
-		&metricValue{
+		{
 			name: "message-commands.sent",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
 			value: net.Int64(self.counters.messages.sent),
 		},
-		&metricValue{
+		{
 			name: "message-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
 			value: net.Int64(self.counters.messages.dropped),
 		},
-		&metricValue{
+		{
 			name: "property-commands.sent",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
 			value: net.Int64(self.counters.prop.sent),
 		},
-		&metricValue{
+		{
 			name: "property-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
 			value: net.Int64(self.counters.prop.dropped),
 		},
-		&metricValue{
+		{
 			name: "entitytag-commands.sent",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
 			value: net.Int64(self.counters.entityTag.sent),
 		},
-		&metricValue{
+		{
 			name: "entitytag-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,

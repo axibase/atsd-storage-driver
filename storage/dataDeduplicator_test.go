@@ -19,11 +19,11 @@ func TestDataCompacter(t *testing.T) {
 		{
 			Name: "Testing interval behavior",
 			GroupParams: map[string]DeduplicationParams{
-				"test01": DeduplicationParams{Threshold: 0, Interval: 1 * time.Second},
-				"test02": DeduplicationParams{Threshold: 0, Interval: 2 * time.Second},
-				"test03": DeduplicationParams{Threshold: 0, Interval: 3 * time.Second},
-				"test04": DeduplicationParams{Threshold: 0, Interval: 4 * time.Second},
-				"test05": DeduplicationParams{Threshold: 0, Interval: 5 * time.Second},
+				"test01": {Threshold: 0, Interval: 1 * time.Second},
+				"test02": {Threshold: 0, Interval: 2 * time.Second},
+				"test03": {Threshold: 0, Interval: 3 * time.Second},
+				"test04": {Threshold: 0, Interval: 4 * time.Second},
+				"test05": {Threshold: 0, Interval: 5 * time.Second},
 			},
 			Group: map[string]struct {
 				InputSeriesCommands    []*net.SeriesCommand
@@ -167,12 +167,12 @@ func TestDataCompacter(t *testing.T) {
 		{
 			Name: "Testing threshold behavior",
 			GroupParams: map[string]DeduplicationParams{
-				"test01": DeduplicationParams{Threshold: 0.1, Interval: time.Minute},
-				"test02": DeduplicationParams{Threshold: 0.2, Interval: time.Minute},
-				"test03": DeduplicationParams{Threshold: 0.3, Interval: time.Minute},
-				"test04": DeduplicationParams{Threshold: 0.4, Interval: time.Minute},
-				"test05": DeduplicationParams{Threshold: 0.5, Interval: time.Minute},
-				"test06": DeduplicationParams{Threshold: 0, Interval: time.Minute},
+				"test01": {Threshold: 0.1, Interval: time.Minute},
+				"test02": {Threshold: 0.2, Interval: time.Minute},
+				"test03": {Threshold: 0.3, Interval: time.Minute},
+				"test04": {Threshold: 0.4, Interval: time.Minute},
+				"test05": {Threshold: 0.5, Interval: time.Minute},
+				"test06": {Threshold: 0, Interval: time.Minute},
 			},
 			Group: map[string]struct {
 				InputSeriesCommands    []*net.SeriesCommand
@@ -385,7 +385,7 @@ func TestDataCompacter(t *testing.T) {
 		{
 			Name: "Testing group behavior",
 			GroupParams: map[string]DeduplicationParams{
-				"test02": DeduplicationParams{Threshold: 0.5, Interval: time.Minute},
+				"test02": {Threshold: 0.5, Interval: time.Minute},
 			},
 			Group: map[string]struct {
 				InputSeriesCommands    []*net.SeriesCommand
