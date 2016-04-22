@@ -14,8 +14,8 @@ type Config struct {
 	MetricPrefix     string
 	SelfMetricEntity string
 
-	ConnectionLimit uint
-	MemstoreLimit   uint
+	SenderGoroutineLimit int
+	MemstoreLimit        uint
 
 	InsecureSkipVerify bool
 
@@ -32,13 +32,13 @@ func GetDefaultConfig() Config {
 	}
 	hostname, _ := os.Hostname()
 	return Config{
-		Url:              urlStruct,
-		MetricPrefix:     "storagedriver",
-		SelfMetricEntity: hostname,
-		ConnectionLimit:  1,
-		MemstoreLimit:    1000000,
-		UpdateInterval:   1 * time.Minute,
-		GroupParams:      map[string]DeduplicationParams{},
+		Url:                  urlStruct,
+		MetricPrefix:         "storagedriver",
+		SelfMetricEntity:     hostname,
+		SenderGoroutineLimit: 1,
+		MemstoreLimit:        1000000,
+		UpdateInterval:       1 * time.Minute,
+		GroupParams:          map[string]DeduplicationParams{},
 	}
 }
 
@@ -68,9 +68,9 @@ func (self *Config) UnmarshalTOML(data interface{}) error {
 		self.SelfMetricEntity = selfMetricEntity
 	}
 
-	if cl, ok := d["connection_limit"]; ok {
-		connectionLimit, _ := cl.(int64)
-		self.ConnectionLimit = uint(connectionLimit)
+	if cl, ok := d["sender_thread_limit"]; ok {
+		senderGoroutineLimit, _ := cl.(int64)
+		self.SenderGoroutineLimit = int(senderGoroutineLimit)
 	}
 
 	if ml, ok := d["memstore_limit"]; ok {

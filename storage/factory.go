@@ -22,18 +22,18 @@ import (
 )
 
 type StorageFactory interface {
-	Create() *Storage
+	Create() (*Storage, error)
 }
 
 type NetworkStorageFactory struct {
-	selfMetricsEntity string
-	metricPrefix      string
-	memstoreLimit     uint
-	protocol          string
-	receiverHostport  string
-	connectionLimit   uint
-	updateInterval    time.Duration
-	groupParams       map[string]DeduplicationParams
+	selfMetricsEntity    string
+	metricPrefix         string
+	memstoreLimit        uint
+	protocol             string
+	receiverHostport     string
+	senderGoroutineLimit int
+	updateInterval       time.Duration
+	groupParams          map[string]DeduplicationParams
 }
 
 func NewNetworkStorageFactory(
@@ -41,26 +41,29 @@ func NewNetworkStorageFactory(
 	protocol,
 	receiverHostport string,
 	memstoreLimit uint,
-	connectionLimit uint,
+	senderGoroutineLimit int,
 	updateInterval time.Duration,
 	metricPrefix string,
 	groupParams map[string]DeduplicationParams,
 ) *NetworkStorageFactory {
 	return &NetworkStorageFactory{
-		selfMetricsEntity: selfMetricsEntity,
-		memstoreLimit:     memstoreLimit,
-		protocol:          protocol,
-		receiverHostport:  receiverHostport,
-		connectionLimit:   connectionLimit,
-		updateInterval:    updateInterval,
-		metricPrefix:      metricPrefix,
-		groupParams:       groupParams,
+		selfMetricsEntity:    selfMetricsEntity,
+		memstoreLimit:        memstoreLimit,
+		protocol:             protocol,
+		receiverHostport:     receiverHostport,
+		senderGoroutineLimit: senderGoroutineLimit,
+		updateInterval:       updateInterval,
+		metricPrefix:         metricPrefix,
+		groupParams:          groupParams,
 	}
 }
 
-func (self *NetworkStorageFactory) Create() *Storage {
+func (self *NetworkStorageFactory) Create() (*Storage, error) {
 	memstore := NewMemStore(self.memstoreLimit)
-	writeCommunicator := NewNetworkCommunicator(self.connectionLimit, self.protocol, self.receiverHostport)
+	writeCommunicator, err := NewNetworkCommunicator(self.senderGoroutineLimit, self.protocol, self.receiverHostport)
+	if err != nil {
+		return nil, err
+	}
 	compactorBuffer := map[string]map[string]sample{}
 	for group := range self.groupParams {
 		compactorBuffer[group] = map[string]sample{}
@@ -76,7 +79,7 @@ func (self *NetworkStorageFactory) Create() *Storage {
 		metricPrefix:           self.metricPrefix,
 	}
 
-	return storage
+	return storage, nil
 }
 
 func NewHttpStorageFactory(
@@ -116,7 +119,7 @@ type HttpStorageFactory struct {
 	groupParams        map[string]DeduplicationParams
 }
 
-func (self *HttpStorageFactory) Create() *Storage {
+func (self *HttpStorageFactory) Create() (*Storage, error) {
 	memstore := NewMemStore(self.memstoreLimit)
 	client := http.New(*self.url, self.username, self.password, self.insecureSkipVerify)
 	writeCommunicator := NewHttpCommunicator(client)
@@ -134,7 +137,7 @@ func (self *HttpStorageFactory) Create() *Storage {
 		isUpdating:             false,
 		metricPrefix:           self.metricPrefix,
 	}
-	return storage
+	return storage, nil
 }
 
 func NewFactoryFromConfig(config Config) StorageFactory {
@@ -145,7 +148,7 @@ func NewFactoryFromConfig(config Config) StorageFactory {
 			config.Url.Scheme,
 			config.Url.Host,
 			config.MemstoreLimit,
-			config.ConnectionLimit,
+			config.SenderGoroutineLimit,
 			config.UpdateInterval,
 			config.MetricPrefix,
 			config.GroupParams,

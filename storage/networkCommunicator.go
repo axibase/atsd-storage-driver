@@ -16,6 +16,8 @@
 package storage
 
 import (
+	"errors"
+	"fmt"
 	"github.com/axibase/atsd-api-go/net"
 	"github.com/golang/glog"
 	"strconv"
@@ -42,27 +44,30 @@ type NetworkCommunicator struct {
 
 	counters []*counters
 
-	connectionLimit uint
+	goroutinesCount int
 }
 
-func NewNetworkCommunicator(connectionLimit uint, protocol, hostport string) *NetworkCommunicator {
+func NewNetworkCommunicator(goroutineCount int, protocol, hostport string) (*NetworkCommunicator, error) {
+	if goroutineCount <= 0 {
+		return nil, errors.New(fmt.Sprintf("goroutines_count should be > 0, provided value = %v", goroutineCount))
+	}
 	nc := &NetworkCommunicator{
 		protocol:                protocol,
 		hostport:                hostport,
-		connectionLimit:         connectionLimit,
+		goroutinesCount:         goroutineCount,
 		seriesCommandsChunkChan: make(chan *Chunk, seriesCommandsChunkChannelBufferSize),
 		properties:              make(chan []*net.PropertyCommand),
 		messageCommands:         make(chan []*net.MessageCommand),
 		entityTag:               make(chan []*net.EntityTagCommand),
-		counters:                make([]*counters, connectionLimit, connectionLimit),
+		counters:                make([]*counters, goroutineCount, goroutineCount),
 	}
 
-	for i := uint(0); i < connectionLimit; i++ {
+	for i := 0; i < goroutineCount; i++ {
 		nc.counters[i] = &counters{}
 	}
 
-	for i := uint(0); i < connectionLimit; i++ {
-		go func(threadNum uint, counters *counters) {
+	for i := 0; i < goroutineCount; i++ {
+		go func(threadNum int, counters *counters) {
 			expBackoff := NewExpBackoff(100*time.Millisecond, 5*time.Minute)
 		start:
 			for {
@@ -128,7 +133,7 @@ func NewNetworkCommunicator(connectionLimit uint, protocol, hostport string) *Ne
 		}(i, nc.counters[i])
 	}
 
-	return nc
+	return nc, nil
 }
 
 func (self *NetworkCommunicator) QueuedSendData(seriesCommandsChunk []*Chunk, entityTagCommands []*net.EntityTagCommand, properties []*net.PropertyCommand, messageCommands []*net.MessageCommand) {
