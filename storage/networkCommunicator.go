@@ -21,6 +21,7 @@ import (
 	"github.com/axibase/atsd-api-go/net"
 	"github.com/golang/glog"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
 
@@ -87,10 +88,10 @@ func NewNetworkCommunicator(goroutineCount int, protocol, hostport string) (*Net
 							if err != nil {
 								glog.Error("Thread ", threadNum, " could not send entity update command: ", err)
 								conn.Close()
-								counters.entityTag.dropped += uint64(len(entityTag) - i)
+								atomic.AddUint64(&counters.entityTag.dropped, uint64(len(entityTag)-i))
 								continue start
 							}
-							counters.entityTag.sent++
+							atomic.AddUint64(&counters.entityTag.sent, 1)
 						}
 					case properties := <-nc.properties:
 						for i := range properties {
@@ -98,10 +99,10 @@ func NewNetworkCommunicator(goroutineCount int, protocol, hostport string) (*Net
 							if err != nil {
 								glog.Error("Thread ", threadNum, " could not send property command: ", err)
 								conn.Close()
-								counters.prop.dropped += uint64(len(properties) - i)
+								atomic.AddUint64(&counters.prop.dropped, uint64(len(properties)-i))
 								continue start
 							}
-							counters.prop.sent++
+							atomic.AddUint64(&counters.prop.sent, 1)
 						}
 					case messageCommands := <-nc.messageCommands:
 						for i := range messageCommands {
@@ -109,10 +110,10 @@ func NewNetworkCommunicator(goroutineCount int, protocol, hostport string) (*Net
 							if err != nil {
 								glog.Error("Thread ", threadNum, " could not send message command: ", err)
 								conn.Close()
-								counters.messages.dropped += uint64(len(messageCommands) - i)
+								atomic.AddUint64(&counters.messages.dropped, uint64(len(messageCommands)-i))
 								continue start
 							}
-							counters.messages.sent++
+							atomic.AddUint64(&counters.messages.sent, 1)
 						}
 					case seriesChunk := <-nc.seriesCommandsChunkChan:
 						for el := seriesChunk.Front(); el != nil; el = seriesChunk.Front() {
@@ -120,11 +121,11 @@ func NewNetworkCommunicator(goroutineCount int, protocol, hostport string) (*Net
 							if err != nil {
 								glog.Error("Thread ", threadNum, " could not send series command: ", err)
 								conn.Close()
-								counters.series.dropped += uint64(seriesChunk.Len())
+								atomic.AddUint64(&counters.series.dropped, uint64(seriesChunk.Len()))
 								continue start
 							}
 							seriesChunk.Remove(el)
-							counters.series.sent++
+							atomic.AddUint64(&counters.series.sent, 1)
 						}
 					}
 					conn.Flush()
@@ -193,7 +194,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: net.Int64(self.counters[i].series.sent),
+				value: net.Int64(atomic.LoadUint64(&self.counters[i].series.sent)),
 			},
 			&metricValue{
 				name: "series-commands.dropped",
@@ -201,7 +202,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: net.Int64(self.counters[i].series.dropped),
+				value: net.Int64(atomic.LoadUint64(&self.counters[i].series.dropped)),
 			},
 			&metricValue{
 				name: "message-commands.sent",
@@ -209,7 +210,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: net.Int64(self.counters[i].messages.sent),
+				value: net.Int64(atomic.LoadUint64(&self.counters[i].messages.sent)),
 			},
 			&metricValue{
 				name: "message-commands.dropped",
@@ -217,7 +218,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: net.Int64(self.counters[i].messages.dropped),
+				value: net.Int64(atomic.LoadUint64(&self.counters[i].messages.dropped)),
 			},
 			&metricValue{
 				name: "property-commands.sent",
@@ -225,7 +226,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: net.Int64(self.counters[i].prop.sent),
+				value: net.Int64(atomic.LoadUint64(&self.counters[i].prop.sent)),
 			},
 			&metricValue{
 				name: "property-commands.dropped",
@@ -233,7 +234,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: net.Int64(self.counters[i].prop.dropped),
+				value: net.Int64(atomic.LoadUint64(&self.counters[i].prop.dropped)),
 			},
 			&metricValue{
 				name: "entitytag-commands.sent",
@@ -241,7 +242,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: net.Int64(self.counters[i].entityTag.sent),
+				value: net.Int64(atomic.LoadUint64(&self.counters[i].entityTag.sent)),
 			},
 			&metricValue{
 				name: "entitytag-commands.dropped",
@@ -249,7 +250,7 @@ func (self *NetworkCommunicator) SelfMetricValues() []*metricValue {
 					"thread":    strconv.FormatInt(int64(i), 10),
 					"transport": self.protocol,
 				},
-				value: net.Int64(self.counters[i].entityTag.dropped),
+				value: net.Int64(atomic.LoadUint64(&self.counters[i].entityTag.dropped)),
 			},
 		)
 	}

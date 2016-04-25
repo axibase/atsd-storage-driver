@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 	"time"
+	"sync"
 )
 
 type sample struct {
@@ -22,9 +23,12 @@ type DeduplicationParams struct {
 type DataCompacter struct {
 	Buffer      map[string]map[string]sample
 	GroupParams map[string]DeduplicationParams
+	sync.Mutex
 }
 
 func (self *DataCompacter) Filter(group string, seriesCommands []*net.SeriesCommand) []*net.SeriesCommand {
+	self.Lock()
+	defer self.Unlock()
 	output := []*net.SeriesCommand{}
 
 	if _, ok := self.Buffer[group]; ok {

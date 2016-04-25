@@ -19,6 +19,7 @@ import (
 	"github.com/axibase/atsd-api-go/http"
 	"github.com/axibase/atsd-api-go/net"
 	"github.com/golang/glog"
+	"sync/atomic"
 	"time"
 )
 
@@ -59,11 +60,11 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 							waitDuration := expBackoff.Duration()
 							glog.Error("Could not send entity update: ", err, "waiting for ", waitDuration)
 							time.Sleep(waitDuration)
-							hc.counters.entityTag.dropped++
+							atomic.AddUint64(&hc.counters.entityTag.dropped, 1)
 							continue
 						}
 					}
-					hc.counters.entityTag.sent++
+					atomic.AddUint64(&hc.counters.entityTag.sent, 1)
 				}
 
 			case propertyCommands := <-hc.propertyCommands:
@@ -74,10 +75,10 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 						waitDuration := expBackoff.Duration()
 						glog.Error("Could not send property: ", err, "waiting for ", waitDuration)
 						time.Sleep(waitDuration)
-						hc.counters.prop.dropped += uint64(len(properties))
+						atomic.AddUint64(&hc.counters.prop.dropped, uint64(len(properties)))
 						continue
 					}
-					hc.counters.prop.sent += uint64(len(properties))
+					atomic.AddUint64(&hc.counters.prop.sent, uint64(len(properties)))
 				}
 			case messageCommands := <-hc.messageCommands:
 				if len(messageCommands) > 0 {
@@ -87,10 +88,10 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 						waitDuration := expBackoff.Duration()
 						glog.Error("Could not send message: ", err, "waiting for ", waitDuration)
 						time.Sleep(waitDuration)
-						hc.counters.messages.dropped += uint64(len(messages))
+						atomic.AddUint64(&hc.counters.messages.dropped, uint64(len(messages)))
 						continue
 					}
-					hc.counters.messages.sent += uint64(len(messages))
+					atomic.AddUint64(&hc.counters.messages.sent, uint64(len(messages)))
 				}
 
 			case seriesChunk := <-hc.seriesCommandsChunkChan:
@@ -101,10 +102,10 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 						waitDuration := expBackoff.Duration()
 						glog.Error("Could not send series: ", err, "waiting for ", waitDuration)
 						time.Sleep(waitDuration)
-						hc.counters.series.dropped += uint64(len(series))
+						atomic.AddUint64(&hc.counters.series.dropped, uint64(len(series)))
 						continue
 					}
-					hc.counters.series.sent += uint64(len(series))
+					atomic.AddUint64(&hc.counters.series.sent, uint64(len(series)))
 				}
 			}
 			expBackoff.Reset()
@@ -168,56 +169,56 @@ func (self *HttpCommunicator) SelfMetricValues() []*metricValue {
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: net.Int64(self.counters.series.sent),
+			value: net.Int64(atomic.LoadUint64(&self.counters.series.sent)),
 		},
 		{
 			name: "series-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: net.Int64(self.counters.series.dropped),
+			value: net.Int64(atomic.LoadUint64(&self.counters.series.dropped)),
 		},
 		{
 			name: "message-commands.sent",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: net.Int64(self.counters.messages.sent),
+			value: net.Int64(atomic.LoadUint64(&self.counters.messages.sent)),
 		},
 		{
 			name: "message-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: net.Int64(self.counters.messages.dropped),
+			value: net.Int64(atomic.LoadUint64(&self.counters.messages.dropped)),
 		},
 		{
 			name: "property-commands.sent",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: net.Int64(self.counters.prop.sent),
+			value: net.Int64(atomic.LoadUint64(&self.counters.prop.sent)),
 		},
 		{
 			name: "property-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: net.Int64(self.counters.prop.dropped),
+			value: net.Int64(atomic.LoadUint64(&self.counters.prop.dropped)),
 		},
 		{
 			name: "entitytag-commands.sent",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: net.Int64(self.counters.entityTag.sent),
+			value: net.Int64(atomic.LoadUint64(&self.counters.entityTag.sent)),
 		},
 		{
 			name: "entitytag-commands.dropped",
 			tags: map[string]string{
 				"transport": self.client.Url().Scheme,
 			},
-			value: net.Int64(self.counters.entityTag.dropped),
+			value: net.Int64(atomic.LoadUint64(&self.counters.entityTag.dropped)),
 		},
 	}
 }
