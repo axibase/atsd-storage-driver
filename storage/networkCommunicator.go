@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/axibase/atsd-api-go/net"
 	"github.com/golang/glog"
+	"net/url"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -48,13 +49,17 @@ type NetworkCommunicator struct {
 	goroutinesCount int
 }
 
-func NewNetworkCommunicator(goroutineCount int, protocol, hostport string) (*NetworkCommunicator, error) {
+func NewNetworkCommunicator(goroutineCount int, url *url.URL) (*NetworkCommunicator, error) {
 	if goroutineCount <= 0 {
 		return nil, errors.New(fmt.Sprintf("goroutines_count should be > 0, provided value = %v", goroutineCount))
 	}
+	if url.Scheme != "tcp" && url.Scheme != "udp" {
+		return nil, errors.New(fmt.Sprintf("unsupported protocol: %v", url.Scheme))
+	}
+
 	nc := &NetworkCommunicator{
-		protocol:                protocol,
-		hostport:                hostport,
+		protocol:                url.Scheme,
+		hostport:                url.Host,
 		goroutinesCount:         goroutineCount,
 		seriesCommandsChunkChan: make(chan *Chunk, seriesCommandsChunkChannelBufferSize),
 		properties:              make(chan []*net.PropertyCommand),

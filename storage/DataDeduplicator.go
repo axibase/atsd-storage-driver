@@ -4,8 +4,8 @@ import (
 	"github.com/axibase/atsd-api-go/net"
 	"math"
 	"sort"
-	"time"
 	"sync"
+	"time"
 )
 
 type sample struct {

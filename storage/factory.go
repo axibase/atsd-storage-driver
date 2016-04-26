@@ -27,19 +27,17 @@ type StorageFactory interface {
 
 type NetworkStorageFactory struct {
 	selfMetricsEntity    string
+	url                  *url.URL
 	metricPrefix         string
 	memstoreLimit        uint
-	protocol             string
-	receiverHostport     string
 	senderGoroutineLimit int
 	updateInterval       time.Duration
 	groupParams          map[string]DeduplicationParams
 }
 
 func NewNetworkStorageFactory(
-	selfMetricsEntity,
-	protocol,
-	receiverHostport string,
+	selfMetricsEntity string,
+	url *url.URL,
 	memstoreLimit uint,
 	senderGoroutineLimit int,
 	updateInterval time.Duration,
@@ -49,8 +47,7 @@ func NewNetworkStorageFactory(
 	return &NetworkStorageFactory{
 		selfMetricsEntity:    selfMetricsEntity,
 		memstoreLimit:        memstoreLimit,
-		protocol:             protocol,
-		receiverHostport:     receiverHostport,
+		url:                  url,
 		senderGoroutineLimit: senderGoroutineLimit,
 		updateInterval:       updateInterval,
 		metricPrefix:         metricPrefix,
@@ -60,7 +57,7 @@ func NewNetworkStorageFactory(
 
 func (self *NetworkStorageFactory) Create() (*Storage, error) {
 	memstore := NewMemStore(self.memstoreLimit)
-	writeCommunicator, err := NewNetworkCommunicator(self.senderGoroutineLimit, self.protocol, self.receiverHostport)
+	writeCommunicator, err := NewNetworkCommunicator(self.senderGoroutineLimit, self.url)
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +81,7 @@ func (self *NetworkStorageFactory) Create() (*Storage, error) {
 
 func NewHttpStorageFactory(
 	selfMetricsEntity string,
-	url url.URL,
-	username,
-	password string,
+	url *url.URL,
 	insecureSkipVerify bool,
 	memstoreLimit uint,
 	updateInterval time.Duration,
@@ -96,9 +91,7 @@ func NewHttpStorageFactory(
 	return &HttpStorageFactory{
 		selfMetricsEntity:  selfMetricsEntity,
 		memstoreLimit:      memstoreLimit,
-		url:                &url,
-		username:           username,
-		password:           password,
+		url:                url,
 		insecureSkipVerify: insecureSkipVerify,
 		updateInterval:     updateInterval,
 		metricPrefix:       metricPrefix,
@@ -111,8 +104,6 @@ type HttpStorageFactory struct {
 	memstoreLimit     uint
 
 	url                *url.URL
-	username           string
-	password           string
 	insecureSkipVerify bool
 	updateInterval     time.Duration
 	metricPrefix       string
@@ -121,7 +112,7 @@ type HttpStorageFactory struct {
 
 func (self *HttpStorageFactory) Create() (*Storage, error) {
 	memstore := NewMemStore(self.memstoreLimit)
-	client := http.New(*self.url, self.username, self.password, self.insecureSkipVerify)
+	client := http.New(*self.url, self.insecureSkipVerify)
 	writeCommunicator := NewHttpCommunicator(client)
 	compactorBuffer := map[string]map[string]sample{}
 	for group := range self.groupParams {
@@ -145,8 +136,7 @@ func NewFactoryFromConfig(config Config) StorageFactory {
 	case "udp", "tcp":
 		return NewNetworkStorageFactory(
 			config.SelfMetricEntity,
-			config.Url.Scheme,
-			config.Url.Host,
+			config.Url,
 			config.MemstoreLimit,
 			config.SenderGoroutineLimit,
 			config.UpdateInterval,
@@ -154,12 +144,9 @@ func NewFactoryFromConfig(config Config) StorageFactory {
 			config.GroupParams,
 		)
 	case "http", "https":
-		password, _ := config.Url.User.Password()
 		return NewHttpStorageFactory(
 			config.SelfMetricEntity,
-			*config.Url,
-			config.Url.User.Username(),
-			password,
+			config.Url,
 			config.InsecureSkipVerify,
 			config.MemstoreLimit,
 			config.UpdateInterval,
@@ -167,12 +154,9 @@ func NewFactoryFromConfig(config Config) StorageFactory {
 			config.GroupParams,
 		)
 	default:
-		password, _ := config.Url.User.Password()
 		return NewHttpStorageFactory(
 			config.SelfMetricEntity,
-			*config.Url,
-			config.Url.User.Username(),
-			password,
+			config.Url,
 			config.InsecureSkipVerify,
 			config.MemstoreLimit,
 			config.UpdateInterval,
