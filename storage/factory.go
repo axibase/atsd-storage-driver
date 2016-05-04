@@ -61,14 +61,10 @@ func (self *NetworkStorageFactory) Create() (*Storage, error) {
 	if err != nil {
 		return nil, err
 	}
-	compactorBuffer := map[string]map[string]sample{}
-	for group := range self.groupParams {
-		compactorBuffer[group] = map[string]sample{}
-	}
 	storage := &Storage{
 		selfMetricsEntity:      self.selfMetricsEntity,
 		memstore:               memstore,
-		dataCompacter:          &DataCompacter{GroupParams: self.groupParams, Buffer: compactorBuffer},
+		dataCompacter:          NewDataCompacter(self.groupParams),
 		writeCommunicator:      writeCommunicator,
 		updateInterval:         self.updateInterval,
 		selfMetricSendInterval: 15 * time.Second,
@@ -114,14 +110,10 @@ func (self *HttpStorageFactory) Create() (*Storage, error) {
 	memstore := NewMemStore(self.memstoreLimit)
 	client := http.New(*self.url, self.insecureSkipVerify)
 	writeCommunicator := NewHttpCommunicator(client)
-	compactorBuffer := map[string]map[string]sample{}
-	for group := range self.groupParams {
-		compactorBuffer[group] = map[string]sample{}
-	}
 	storage := &Storage{
 		selfMetricsEntity:      self.selfMetricsEntity,
 		memstore:               memstore,
-		dataCompacter:          &DataCompacter{GroupParams: self.groupParams, Buffer: compactorBuffer},
+		dataCompacter:          NewDataCompacter(self.groupParams),
 		writeCommunicator:      writeCommunicator,
 		updateInterval:         self.updateInterval,
 		selfMetricSendInterval: 15 * time.Second,
