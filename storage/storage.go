@@ -94,18 +94,31 @@ func (self *Storage) selfMetricSendTask() {
 
 }
 
-func (self *Storage) SendSeriesCommands(group string, seriesCommands []*net.SeriesCommand) {
+func (self *Storage) QueuedSendSeriesCommands(group string, seriesCommands []*net.SeriesCommand) {
 	filteredSeriesCommands := self.dataCompacter.Filter(group, seriesCommands)
 	self.memstore.AppendSeriesCommands(filteredSeriesCommands)
 }
-func (self *Storage) SendPropertyCommands(propertyCommands []*net.PropertyCommand) {
+func (self *Storage) DirectSendSeriesCommands(group string, seriesCommands []*net.SeriesCommand) {
+	filteredSeriesCommands := self.dataCompacter.Filter(group, seriesCommands)
+	self.writeCommunicator.PriorSendData(filteredSeriesCommands, nil, nil, nil)
+}
+func (self *Storage) QueuedSendPropertyCommands(propertyCommands []*net.PropertyCommand) {
 	self.memstore.AppendPropertyCommands(propertyCommands)
 }
-func (self *Storage) SendEntityTagCommands(entityTagCommands []*net.EntityTagCommand) {
+func (self *Storage) DirectSendPropertyCommands(propertyCommands []*net.PropertyCommand) {
+	self.writeCommunicator.PriorSendData(nil, nil, propertyCommands, nil)
+}
+func (self *Storage) QueuedSendEntityTagCommands(entityTagCommands []*net.EntityTagCommand) {
 	self.memstore.AppendEntityTagCommands(entityTagCommands)
 }
-func (self *Storage) SendMessageCommands(messageCommands []*net.MessageCommand) {
+func (self *Storage) DirectSendEntityTagCommands(entityTagCommands []*net.EntityTagCommand) {
+	self.writeCommunicator.PriorSendData(nil, entityTagCommands, nil, nil)
+}
+func (self *Storage) QueuedSendMessageCommands(messageCommands []*net.MessageCommand) {
 	self.memstore.AppendMessageCommands(messageCommands)
+}
+func (self *Storage) DirectSendMessageCommands(messageCommands []*net.MessageCommand) {
+	self.writeCommunicator.PriorSendData(nil, nil, nil, messageCommands)
 }
 
 func (self *Storage) StartPeriodicSending() {
