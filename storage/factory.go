@@ -56,7 +56,10 @@ func NewNetworkStorageFactory(
 }
 
 func (self *NetworkStorageFactory) Create() (*Storage, error) {
-	memstore := NewMemStore(self.memstoreLimit)
+	memstore, err := NewMemStore(self.memstoreLimit)
+	if err != nil {
+		return nil, err
+	}
 	writeCommunicator, err := NewNetworkCommunicator(self.senderGoroutineLimit, self.url)
 	if err != nil {
 		return nil, err
@@ -107,7 +110,10 @@ type HttpStorageFactory struct {
 }
 
 func (self *HttpStorageFactory) Create() (*Storage, error) {
-	memstore := NewMemStore(self.memstoreLimit)
+	memstore, err := NewMemStore(self.memstoreLimit)
+	if err != nil {
+		return nil, err
+	}
 	client := http.New(*self.url, self.insecureSkipVerify)
 	writeCommunicator := NewHttpCommunicator(client)
 	storage := &Storage{

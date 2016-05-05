@@ -16,9 +16,14 @@
 package storage
 
 import (
+	"fmt"
 	"github.com/axibase/atsd-api-go/net"
 	"sort"
 	"sync"
+)
+
+const (
+	minMemoryLimit = uint(10000)
 )
 
 type MemStore struct {
@@ -35,12 +40,15 @@ type MemStore struct {
 	Limit uint
 }
 
-func NewMemStore(limit uint) *MemStore {
+func NewMemStore(limit uint) (*MemStore, error) {
+	if limit < minMemoryLimit {
+		return nil, fmt.Errorf("Memstore limit should be >= 10000. Current limit = %v", limit)
+	}
 	ms := &MemStore{
 		seriesCommandMap: &map[string]*Chunk{},
 		Limit:            limit,
 	}
-	return ms
+	return ms, nil
 }
 func (self *MemStore) AppendSeriesCommands(commands []*net.SeriesCommand) {
 	self.Lock()
