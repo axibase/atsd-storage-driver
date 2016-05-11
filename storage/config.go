@@ -1,9 +1,10 @@
 package storage
 
 import (
-	neturl "net/url"
 	"os"
 	"time"
+
+	neturl "net/url"
 )
 
 type Config struct {

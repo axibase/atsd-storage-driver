@@ -1,10 +1,11 @@
 package storage
 
 import (
-	"github.com/axibase/atsd-api-go/net"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/axibase/atsd-api-go/net"
 )
 
 func TestDataCompacter(t *testing.T) {

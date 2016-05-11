@@ -16,9 +16,10 @@
 package storage
 
 import (
-	"github.com/axibase/atsd-api-go/http"
 	"net/url"
 	"time"
+
+	"github.com/axibase/atsd-api-go/http"
 )
 
 type StorageFactory interface {

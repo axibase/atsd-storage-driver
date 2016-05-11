@@ -16,11 +16,13 @@
 package storage
 
 import (
-	"github.com/axibase/atsd-api-go/http"
-	"github.com/axibase/atsd-api-go/net"
-	"github.com/golang/glog"
 	"sync/atomic"
 	"time"
+
+	"github.com/golang/glog"
+
+	"github.com/axibase/atsd-api-go/http"
+	"github.com/axibase/atsd-api-go/net"
 )
 
 type HttpCommunicator struct {
@@ -55,14 +57,7 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 				for _, entity := range entities {
 					err := hc.client.Entities.Update(entity)
 					if err != nil {
-						err = hc.client.Entities.Create(entity)
-						if err != nil {
-							waitDuration := expBackoff.Duration()
-							glog.Error("Could not send entity update: ", err, "waiting for ", waitDuration)
-							time.Sleep(waitDuration)
-							atomic.AddUint64(&hc.counters.entityTag.dropped, 1)
-							continue
-						}
+						tryWhileNotComplete(func() error { return hc.client.Entities.Create(entity) }, "entity update", expBackoff)
 					}
 					atomic.AddUint64(&hc.counters.entityTag.sent, 1)
 				}
@@ -70,41 +65,20 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 			case propertyCommands := <-hc.propertyCommands:
 				if len(propertyCommands) > 0 {
 					properties := propertyCommandsToProperties(propertyCommands)
-					err := hc.client.Properties.Insert(properties)
-					if err != nil {
-						waitDuration := expBackoff.Duration()
-						glog.Error("Could not send property: ", err, "waiting for ", waitDuration)
-						time.Sleep(waitDuration)
-						atomic.AddUint64(&hc.counters.prop.dropped, uint64(len(properties)))
-						continue
-					}
+					tryWhileNotComplete(func() error { return hc.client.Properties.Insert(properties) }, "properties insert", expBackoff)
 					atomic.AddUint64(&hc.counters.prop.sent, uint64(len(properties)))
 				}
 			case messageCommands := <-hc.messageCommands:
 				if len(messageCommands) > 0 {
 					messages := messageCommandsToProperties(messageCommands)
-					err := hc.client.Messages.Insert(messages)
-					if err != nil {
-						waitDuration := expBackoff.Duration()
-						glog.Error("Could not send message: ", err, "waiting for ", waitDuration)
-						time.Sleep(waitDuration)
-						atomic.AddUint64(&hc.counters.messages.dropped, uint64(len(messages)))
-						continue
-					}
+					tryWhileNotComplete(func() error { return hc.client.Messages.Insert(messages) }, "messages insert", expBackoff)
 					atomic.AddUint64(&hc.counters.messages.sent, uint64(len(messages)))
 				}
 
 			case seriesChunk := <-hc.seriesCommandsChunkChan:
 				series := seriesCommandsChunkToSeries(seriesChunk)
 				if len(series) > 0 {
-					err := hc.client.Series.Insert(series)
-					if err != nil {
-						waitDuration := expBackoff.Duration()
-						glog.Error("Could not send series: ", err, "waiting for ", waitDuration)
-						time.Sleep(waitDuration)
-						atomic.AddUint64(&hc.counters.series.dropped, uint64(len(series)))
-						continue
-					}
+					tryWhileNotComplete(func() error { return hc.client.Series.Insert(series) }, "series insert", expBackoff)
 					atomic.AddUint64(&hc.counters.series.sent, uint64(len(series)))
 				}
 			}
@@ -113,6 +87,23 @@ func NewHttpCommunicator(client *http.Client) *HttpCommunicator {
 	}()
 
 	return hc
+}
+
+func tryWhileNotComplete(task func() error, taskName string, expBackoff *ExpBackoff) {
+	firstTime := true
+	hasErrors := false
+	for firstTime || hasErrors {
+		firstTime = false
+		err := task()
+		hasErrors = err != nil
+		if hasErrors {
+			waitDuration := expBackoff.Duration()
+			glog.Error("Could not perform ", taskName, ": ", err, "waiting for ", waitDuration)
+			time.Sleep(waitDuration)
+		} else {
+			expBackoff.Reset()
+		}
+	}
 }
 
 func (self *HttpCommunicator) QueuedSendData(seriesCommandsChunk []*Chunk, entityTagCommands []*net.EntityTagCommand, propertyCommands []*net.PropertyCommand, messageCommands []*net.MessageCommand) {

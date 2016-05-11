@@ -17,9 +17,10 @@ package storage
 
 import (
 	"container/list"
-	"github.com/axibase/atsd-api-go/net"
 	"sync"
 	"time"
+
+	"github.com/axibase/atsd-api-go/net"
 )
 
 type metricValue struct {

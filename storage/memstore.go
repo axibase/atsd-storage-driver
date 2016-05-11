@@ -17,9 +17,10 @@ package storage
 
 import (
 	"fmt"
-	"github.com/axibase/atsd-api-go/net"
 	"sort"
 	"sync"
+
+	"github.com/axibase/atsd-api-go/net"
 )
 
 const (

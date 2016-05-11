@@ -1,11 +1,12 @@
 package storage
 
 import (
-	"github.com/axibase/atsd-api-go/net"
 	"math"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/axibase/atsd-api-go/net"
 )
 
 type sample struct {
